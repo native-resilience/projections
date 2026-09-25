@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="https://native-climate.com/wp-content/uploads/2022/08/NC-logo-web.png" alt="Native Climate Logo" width="200" height="200" />
+  <img src="https://native-resilience.com/wp-content/uploads/2025/02/NR-dark-bluebk-300x300.png" alt="Native Resilience Logo" width="200" height="200" />
 </p>
 
-## Native Climate CMIP6 Agricultural Climate Projections
+## Native Resilience CMIP6 Agricultural Climate Projections
 
 <p align="center">
 <strong>Data are available via a searchable web map at<br>
-https://native-climate.com/projections/</strong>
+https://native-resilience.com/projections/</strong>
 <br><br>
 <strong>Browse the archive here:<br>
 https://data.climate.umt.edu/native-climate/projections/</strong>
 </p>
 
-[*Native Climate*](https://native-climate.com) is a USDA NIFA-funded project to support climate
+[*Native Resilience*](https://native-resilience.com) (formerly Native Climate) is a USDA NIFA-funded project to support climate
 adaptation efforts in Native American communities by building new
 connections between Native wisdom and Western scientific data. Through
 two-way information-sharing and relationship-building, Native Climate
@@ -257,9 +257,31 @@ with frozen precipitation</td>
 </tbody>
 </table>
 
+## Web map
+
+The searchable map at <https://native-resilience.github.io/projections/>
+(embedded at <https://native-resilience.com/projections/>) is a static
+page in `docs/`, served by GitHub Pages from the `main` branch. It follows
+the Montana Climate Office web style
+([mt-climate-office/mco-web-style](https://github.com/mt-climate-office/mco-web-style),
+pinned at `@0.6.0`) and uses MapLibre GL 5 with the CARTO vector basemaps.
+
+- `docs/index.html`, `docs/app.js`, `docs/app.css` — hand-written page;
+  not generated.
+- `docs/data/native-land.geojson` and `docs/data/native-land-index.json` —
+  simplified boundaries and the search index, written by
+  `projections-map.R` from `native-land.parquet` (itself built by
+  `projections.R`). Re-run `Rscript projections-map.R` whenever the
+  boundaries change; add `--check-links` (off campus) to HEAD-check every
+  PDF and zip URL.
+- Preview locally with `python3 -m http.server 8000 --directory docs`.
+- Bumping the kit or MapLibre version means new SRI hashes (kit README) and
+  a recomputed anti-flash `sha256` in the page's CSP (kit `MIGRATING.md`).
+- Pushing to `main` deploys to production.
+
 **Please contact Dr. Kyle Bocinsky, Director of Climate Extension for
 the Montana Climate Office with any technical questions about these
 data:
 [kyle.bocinsky@umontana.edu](mailto:kyle.bocinsky@umontana.edu?subject=CMIP6%20Tribal%20Projections).
 Code for producing all data supplied here is freely available on Github:
-<https://github.com/native-climate/projections>.**
+<https://github.com/native-resilience/projections>.**

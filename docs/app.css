@@ -1,0 +1,97 @@
+/* ============================================================================
+   Native Resilience · CMIP6 Agricultural Climate Projections map · app.css
+   App-specific LAYOUT only. Chrome, tokens, and component shells come from
+   mco-web-style (mco-theme.css). No raw hexes; positional values key off the
+   kit's z-index ladder (HOUSE-STYLE.md §3).
+   ========================================================================== */
+
+/* Full-viewport app frame — §3 (100dvh, never 100vh) */
+body { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+main { flex: 1; min-height: 0; position: relative; }
+main:focus { outline: none; }
+#map { width: 100%; height: 100%; }
+
+/* Brand title is an <h1> for document outline; the kit styles .brand-title
+   as a small uppercase label, so undo the UA heading defaults only. */
+h1.brand-title { font-size: 0.65rem; margin: 0; }
+
+/* Name search — the KEYBOARD path to every polygon (§5.8). The kit owns the
+   collapse mechanics (.mco-search-collapse); the field itself is app-owned. */
+.search-wrap { display: flex; align-items: center; }
+.search-wrap input[type="search"] {
+  min-height: 34px; width: 240px;
+  padding: 4px 10px;
+  background: var(--input-bg); color: var(--text-primary);
+  border: 1px solid var(--ctrl-border); border-radius: var(--radius-md);
+  font-family: inherit; font-size: 0.78rem;
+}
+.search-wrap input[type="search"]:focus-visible {
+  outline: 2px solid var(--accent-line); outline-offset: 1px;
+}
+
+/* Land detail card — desktop: floats top-left over the map (nav controls
+   live top-right). Compact: docks to the bottom edge (§3 bottom-sheet
+   pattern, simplified). --z-detail tier. */
+#land-card {
+  position: absolute; left: 0.75rem; top: 0.75rem;
+  width: min(340px, calc(100vw - 2rem));
+  z-index: var(--z-detail);
+}
+#land-card .mco-panel-title { white-space: normal; }
+.card-actions {
+  display: flex; gap: 0.6rem;
+  padding: 0.25rem 0.75rem 0.75rem;
+}
+.card-actions a {
+  flex: 1 1 0;
+  display: flex; flex-direction: column; align-items: center; gap: 0.35rem;
+  min-height: 44px; padding: 0.6rem 0.4rem;
+  color: var(--accent-line);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  text-decoration: none; text-align: center;
+  font-size: 0.78rem; font-weight: 500; line-height: 1.2;
+}
+.card-actions a:hover,
+.card-actions a:focus-visible { text-decoration: underline; border-color: var(--accent-line); }
+.card-actions svg { width: 28px; height: 28px; flex-shrink: 0; }
+.is-compact #land-card {
+  left: 0; right: 0; top: auto; bottom: 0;
+  width: auto; max-width: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Status line over the map (loading / error) — --z-map-notice tier */
+#app-note {
+  position: absolute; top: 0.5rem; left: 50%; transform: translateX(-50%);
+  max-width: calc(100vw - 2rem);
+  z-index: var(--z-map-notice);
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 0.3rem 0.8rem;
+  font-size: 0.78rem; color: var(--text-secondary);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+#app-note button { margin-left: 0.5rem; }
+
+/* Screen-reader table twin of the WebGL layer (§5.2). Also the no-WebGL
+   fallback: app.js adds .is-visible when the map can't initialise, which
+   undoes .sr-only and shows the 633-row link table in place of the map. */
+#sr-land-section.is-visible {
+  position: static; width: auto; height: auto; margin: 0; padding: 1rem;
+  overflow: auto; clip: auto; clip-path: none; white-space: normal;
+  flex: 1; min-height: 0;
+  color: var(--text-primary);
+}
+#sr-land-section.is-visible table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+#sr-land-section.is-visible th,
+#sr-land-section.is-visible td { text-align: left; padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); }
+#sr-land-section.is-visible a { color: var(--accent-line); }
+.is-fallback #map { display: none; }
+
+/* kit-override: pending mco-web-style 0.7.0 ("Underline .maplibregl-ctrl-attrib a").
+   With the hillshade credit the attribution reads as a text block, and links
+   distinguished by colour alone fail WCAG 1.4.1. Remove when 0.7.0 ships. */
+.maplibregl-ctrl-attrib a { text-decoration: underline; }
+
+/* Info modal prose */
+.info-section p, .info-section li { font-size: 0.85rem; line-height: 1.5; }

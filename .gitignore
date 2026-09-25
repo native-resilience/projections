@@ -8,3 +8,9 @@
 data-derived
 output
 upload
+# mco-web-style consumer-verify scratch (kit MIGRATING.md)
+node_modules/
+package.json
+package-lock.json
+verify-out/
+consumer-verify.mjs
