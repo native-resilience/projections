@@ -9,7 +9,7 @@
 https://native-resilience.com/projections/</strong>
 <br><br>
 <strong>Browse the archive here:<br>
-https://data.climate.umt.edu/native-climate/projections/</strong>
+https://data.native-resilience.com/projections/</strong>
 </p>
 
 [*Native Resilience*](https://native-resilience.com) (formerly Native Climate) is a USDA NIFA-funded project to support climate
@@ -257,6 +257,32 @@ with frozen precipitation</td>
 </tbody>
 </table>
 
+## Data archive
+
+The per-land zips and PDF reports are archived in the public S3 bucket
+`s3://native-resilience` (us-west-2) under `projections/`, served at
+<https://data.native-resilience.com/projections/>:
+
+- `<Native_Land_Name>.zip` — the XLSX workbook and PDF report for one land
+  (spaces in the name become underscores).
+- `pdf/<Native Land Name>_CMIP6-climate-projections.pdf` — the PDF report alone.
+- `native-land.parquet` — the GeoParquet boundaries of all 633 lands.
+- `projections-manifest.json` — every file with its size and sha256;
+  `_manifest.txt` — one download URL per line.
+
+No credentials are needed:
+
+``` bash
+aws s3 ls s3://native-resilience/projections/ --no-sign-request
+aws s3 cp "s3://native-resilience/projections/pdf/Acoma Pueblo_CMIP6-climate-projections.pdf" . --no-sign-request
+```
+
+`projections.R` builds `upload/` locally; `Rscript projections-publish.R`
+(with `aws sso login --profile mco`) mirrors it to the bucket, verifies
+every file, and rewrites the manifests. The original host,
+`data.climate.umt.edu/native-climate/projections/`, still serves the same
+files.
+
 ## Web map
 
 The searchable map at <https://native-resilience.github.io/projections/>
@@ -272,7 +298,7 @@ pinned at `@0.6.0`) and uses MapLibre GL 5 with the CARTO vector basemaps.
   simplified boundaries and the search index, written by
   `projections-map.R` from `native-land.parquet` (itself built by
   `projections.R`). Re-run `Rscript projections-map.R` whenever the
-  boundaries change; add `--check-links` (off campus) to HEAD-check every
+  boundaries change; add `--check-links` to HEAD-check every
   PDF and zip URL.
 - Preview locally with `python3 -m http.server 8000 --directory docs`.
 - Bumping the kit or MapLibre version means new SRI hashes (kit README) and

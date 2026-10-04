@@ -1,5 +1,5 @@
 /* ============================================================================
-   Native Resilience · CMIP6 Agricultural Climate Projections map · app.js
+   Native Resilience · CMIP6 Agricultural Projections map · app.js
    Built on mco-web-style (window.MCO, window.MCO.map) + MapLibre GL 5.
    Section references (§) are to the kit's HOUSE-STYLE.md. Classic script,
    external file so the page's CSP can pin script-src 'self'.

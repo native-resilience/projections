@@ -29,11 +29,11 @@ library(sf)
 library(dplyr)
 library(stringr)
 
-BASE <- "https://data.climate.umt.edu/native-climate/projections/"
+BASE <- "https://data.native-resilience.com/projections/"
 
 # Percent-encode a path segment: space -> %20, non-ASCII -> UTF-8 %XX bytes.
 # Leaves ' ( ) - . , alone. Byte-identical to JS encodeURI(), and matches the
-# URLs the archive server actually resolves. The JS assigns these to a.href
+# keys in s3://native-resilience/projections/. The JS assigns these to a.href
 # verbatim and never re-encodes.
 url_enc <- function(x) utils::URLencode(enc2utf8(x), reserved = FALSE)
 
@@ -140,8 +140,7 @@ message(sprintf("docs/data/native-land-index.json: %.0f KB",
                 file.size("docs/data/native-land-index.json") / 1e3))
 
 # ── Link check (optional) ────────────────────────────────────────────────────
-# data.climate.umt.edu resolves to a private IP on campus, so run this from
-# off campus: Rscript projections-map.R --check-links
+# Rscript projections-map.R --check-links
 if ("--check-links" %in% commandArgs(trailingOnly = TRUE)) {
   urls <- c(simp$pdf_url, simp$zip_url)
   status <- vapply(urls, function(u) {

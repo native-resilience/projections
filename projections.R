@@ -1451,7 +1451,8 @@ plan(sequential)
 gc()
 gc()
 
-# scp -r upload/pdf kbocinsky@fcfc-mcoapps:/var/data/native-climate/projections/
+# Publish upload/ to s3://native-resilience/projections/ with
+# Rscript projections-publish.R
 
 
 # list.files("output",

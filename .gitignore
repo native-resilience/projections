@@ -14,3 +14,7 @@ package.json
 package-lock.json
 verify-out/
 consumer-verify.mjs
+
+# projections-publish.R sha256 cache
+.sha256-cache.tsv
+publish.log
