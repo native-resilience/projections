@@ -15,8 +15,27 @@ nex_open <- function(key, access) {
   list(rast = terra::rast(f), file = f)
 }
 
-extract_task <- function(task, lands, landset, access, outdir, publish) {
-  lands_rot <- st_rotate(lands)
+# Rotated boundaries are written to disk once by the main process; each
+# daemon reads them on first use and keeps them for the rest of the run
+# (an environment's contents survive mirai's between-task cleanup).
+.nr_cache <- new.env()
+
+nr_cached_rds <- function(path) {
+  if (!identical(.nr_cache$path, path)) {
+    .nr_cache$value <- readRDS(path)
+    .nr_cache$path <- path
+  }
+  .nr_cache$value
+}
+
+# `item`: list(task = one row of the task table as a list, with `files` a
+# tibble of variable/key; landset = id; land_ids = lands in the landset).
+extract_task <- function(item, lands_file, access, outdir, publish) {
+  task <- item$task
+  landset <- item$landset
+  all_rot <- nr_cached_rds(lands_file)
+  lands_rot <- all_rot[all_rot$land_id %in% item$land_ids, ]
+  lands <- sf::st_drop_geometry(lands_rot)
   e <- terra::ext(sf::st_bbox(lands_rot)) + 0.5
 
   vals <- purrr::map(stats::setNames(NEX_VARIABLES, NEX_VARIABLES), \(v) {

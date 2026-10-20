@@ -118,20 +118,24 @@ if (nr_stage("extract")) {
             dplyr::n_distinct(need$land_id), " lands")
 
     access <- Sys.getenv("NR_NEX_ACCESS", unset = "download")
+    landset_ids <- split(landsets_new$land_id, landsets_new$landset)
+    lands_file <- normalizePath(".nr-lands-rotated.rds", mustWork = FALSE)
+    saveRDS(st_rotate(lands), lands_file)
     batches <- split(seq_len(nrow(plan)), ceiling(seq_len(nrow(plan)) / 200))
     for (b in batches) {
+      # Each element carries only its own task; the boundaries go through
+      # lands_file, read once per daemon.
+      items <- purrr::map(b, \(i) {
+        p <- plan[i, ]
+        task <- as.list(tasks[tasks$task_id == p$task_id, ])
+        task$files <- task$files[[1]]
+        list(task = task, landset = p$landset,
+             land_ids = landset_ids[[p$landset]])
+      })
       rows <- nr_map(
-        b,
-        \(i) {
-          p <- plan[i, ]
-          task <- tasks[tasks$task_id == p$task_id, ]
-          ls <- dplyr::filter(lands, land_id %in% landsets[[p$landset]])
-          extract_task(as.list(task) |> purrr::modify_at("files", \(x) x[[1]]),
-                       ls, p$landset, access, DIR_CACHE, publish)
-        },
-        plan = plan, tasks = tasks, lands = lands, access = access,
-        publish = nr_publish(),
-        landsets = split(landsets_new$land_id, landsets_new$landset)
+        items,
+        \(item) extract_task(item, lands_file, access, DIR_CACHE, publish),
+        lands_file = lands_file, access = access, publish = nr_publish()
       )
       ledger_record(dplyr::bind_rows(rows))
       nr_state_push()

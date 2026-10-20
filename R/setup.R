@@ -13,6 +13,9 @@
 suppressPackageStartupMessages({
   library(magrittr)
   library(ggplot2)
+  # sf registers the dplyr/vctrs methods for sf objects; without it loaded,
+  # a daemon handed an sf object cannot subset it.
+  library(sf)
 })
 
 source("R/s3-archive.R")

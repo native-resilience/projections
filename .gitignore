@@ -23,3 +23,4 @@ publish*.log
 _cache
 _state
 data
+.nr-lands-rotated.rds
