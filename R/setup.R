@@ -139,6 +139,10 @@ nr_map <- function(.x, .f, ..., .workers = nr_workers(), .progress = TRUE) {
   mirai::everywhere({
     setwd(wd)
     suppressMessages(source("R/setup.R"))
+    # rlang's backtrace capture fails inside in_parallel() closures and
+    # replaces any purrr/rlang error with "bad value"; skip the capture so
+    # workers report their real errors.
+    options(`rlang:::disable_trace_capture` = TRUE)
   }, wd = wd)
   # in_parallel() only accepts a function written inside its call, so wrap
   # `.f` and rebind its environment on the daemon to the named data.

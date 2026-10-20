@@ -63,6 +63,9 @@ nr_smooth_fit <- function(data, family, type) {
 nr_smooth_quantiles <- function(fit, family, type, years, probs = SMOOTH_PROBS) {
   nd <- tibble::tibble(Year = years, n_days = 365L)
   par <- suppressWarnings(stats::predict(fit, newdata = nd, type = "parameter"))
+  # One-parameter families (e.g. BI) come back as a bare vector.
+  if (!is.data.frame(par))
+    par <- stats::setNames(data.frame(par), fit$family$names[[1]])
   qfun <- get(paste0("q", family), envir = asNamespace("gamlss.dist"))
   extra <- if (family %in% BINOMIAL_FAMILIES) list(bd = nd$n_days) else list()
   out <- purrr::map(probs, \(p) do.call(qfun, c(list(p = p), as.list(par), extra)))
