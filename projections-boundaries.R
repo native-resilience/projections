@@ -133,8 +133,8 @@ message(nrow(native_land), " units (", sum(native_land$modeled), " modeled, ",
 unlink("native-land.parquet")
 sf::write_sf(native_land, "native-land.parquet",
              driver = "Parquet",
-             layer_options = c("COMPRESSION=BROTLI",
-                               "GEOMETRY_ENCODING=GEOARROW",
+             layer_options = c("COMPRESSION=ZSTD",
+                               "GEOMETRY_ENCODING=WKB",
                                "WRITE_COVERING_BBOX=NO"))
 
 # Old (2024) archive name -> new unit, for retiring or redirecting old keys.

@@ -48,7 +48,7 @@ for (f in c("variables.parquet", "lands.parquet"))
            cache_control = "max-age=3600")
 
 # ---- Orphans: published zips/PDFs that no current land produces ----
-land_names <- sf::st_drop_geometry(sf::read_sf("native-land.parquet"))
+land_names <- sf::st_drop_geometry(nr_read_lands())
 land_names <- land_names$name[land_names$modeled]
 expected <- c(paste0(s3_prefix, "/", gsub(" ", "_", land_names), ".zip"),
               paste0(s3_prefix, "/pdf/", land_names, "_CMIP6-climate-projections.pdf"))

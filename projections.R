@@ -25,7 +25,7 @@ if (nr_publish()) {
 }
 
 lands <-
-  sf::read_sf("native-land.parquet") %>%
+  nr_read_lands() %>%
   sf::st_drop_geometry() %>%
   dplyr::filter(modeled)
 if (length(nr_env_list("NR_LANDS")))
@@ -155,7 +155,7 @@ if (nr_stage("dashboard")) {
   metrics_table() %>%
     dplyr::rename(variable = metric_id) %>%
     arrow::write_parquet(file.path(DIR_DATA, "variables.parquet"))
-  sf::read_sf("native-land.parquet") %>%
+  nr_read_lands() %>%
     sf::st_drop_geometry() %>%
     arrow::write_parquet(file.path(DIR_DATA, "lands.parquet"))
 

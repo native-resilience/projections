@@ -29,6 +29,8 @@ library(sf)
 library(dplyr)
 library(stringr)
 
+source("R/geo.R")
+
 BASE <- "https://data.native-resilience.com/projections/"
 
 # Percent-encode a path segment: space -> %20, non-ASCII -> UTF-8 %XX bytes.
@@ -41,7 +43,7 @@ url_enc <- function(x) utils::URLencode(enc2utf8(x), reserved = FALSE)
 # Only modeled units (reservations, statistical areas, Navajo agencies and
 # Hawai‘i climate divisions) have workbooks and PDFs to link to.
 land <-
-  sf::read_sf("native-land.parquet") %>%
+  nr_read_lands() %>%
   dplyr::filter(modeled) %>%
   dplyr::transmute(land_id, name) %>%
   dplyr::arrange(name) %>%

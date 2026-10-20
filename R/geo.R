@@ -25,3 +25,16 @@ nr_slug <- function(x) {
   x <- tolower(gsub("[^A-Za-z0-9]+", "-", x))
   gsub("(^-|-$)", "", x)
 }
+
+# Read native-land.parquet. sf's Parquet driver needs a GDAL built with
+# Arrow, which some images (e.g. rocker/geospatial) lack; the file stores
+# WKB geometry, so arrow alone can read it there.
+nr_read_lands <- function(file = "native-land.parquet") {
+  if ("Parquet" %in% sf::st_drivers()$name)
+    return(sf::read_sf(file))
+  x <- arrow::read_parquet(file)
+  geom <- sf::st_as_sfc(structure(as.list(x$geometry), class = "WKB"),
+                        crs = 4326)
+  sf::st_sf(tibble::as_tibble(x[setdiff(names(x), "geometry")]),
+            geometry = geom)
+}

@@ -25,7 +25,7 @@ if (nr_publish()) {
   nr_state_pull()
 }
 
-lands <- sf::read_sf("native-land.parquet")
+lands <- nr_read_lands()
 if (length(nr_env_list("NR_LANDS")))
   lands <- dplyr::filter(lands, land_id %in% nr_env_list("NR_LANDS"))
 
