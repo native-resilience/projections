@@ -202,7 +202,7 @@ if (nr_stage("daily")) {
     duckdb::duckdb_register(con, "valid_tasks",
                             dplyr::select(tasks, task_key))
 
-    staging <- tempfile("daily-")
+    staging <- nr_staging_dir(DIR_DAILY)
     for (chunk in split(pending$land_id, ceiling(seq_along(pending$land_id) / 50))) {
       duckdb::duckdb_register(con, "chunk", tibble::tibble(land_id = chunk))
       DBI::dbExecute(con, glue::glue("
@@ -223,12 +223,15 @@ if (nr_stage("daily")) {
       duckdb::duckdb_unregister(con, "chunk")
     }
 
-    for (id in pending$land_id) {
-      dest <- file.path(DIR_DAILY, paste0("land_id=", id))
-      unlink(dest, recursive = TRUE)
-      dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
-      file.rename(file.path(staging, paste0("land_id=", id)), dest)
-    }
+    for (id in pending$land_id)
+      nr_move_partition(file.path(staging, paste0("land_id=", id)),
+                        file.path(DIR_DAILY, paste0("land_id=", id)))
+    unlink(staging, recursive = TRUE)
+    built <- file.exists(file.path(DIR_DAILY, paste0("land_id=", pending$land_id),
+                                   "part-0.parquet"))
+    if (!all(built))
+      stop("daily: ", sum(!built), " partitions missing after the build",
+           call. = FALSE)
 
     if (nr_publish()) {
       s3_push(s3_bucket_name, file.path(s3_prefix, DIR_DAILY), DIR_DAILY,

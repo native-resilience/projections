@@ -146,3 +146,22 @@ nr_map <- function(.x, .f, ..., .workers = nr_workers(), .progress = TRUE) {
              }, fn = .f, fn_data = list(...)),
              .progress = .progress)
 }
+
+# ---- Staged partition writes ----
+# Partitions are written to a staging dir beside their destination, then
+# renamed into place. Staging must be on the same filesystem: in a container
+# tempdir() and the bind-mounted work dir are different devices, and
+# file.rename() across devices fails with only a warning.
+nr_staging_dir <- function(dest_parent) {
+  dir.create(dest_parent, recursive = TRUE, showWarnings = FALSE)
+  file.path(dest_parent, paste0(".staging-", basename(tempfile())))
+}
+
+nr_move_partition <- function(from, to) {
+  if (!dir.exists(from) || length(list.files(from)) == 0)
+    stop("staged partition missing or empty: ", from, call. = FALSE)
+  unlink(to, recursive = TRUE)
+  if (!file.rename(from, to))
+    stop("could not move ", from, " to ", to, call. = FALSE)
+  invisible(to)
+}

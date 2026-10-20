@@ -125,7 +125,7 @@ if (nr_stage("dashboard")) {
                             tibble::tibble(metric_id = pending_dash$item))
     for (src in c("annual", "smoothed")) {
       out <- file.path(DIR_DATA, paste0(src, "-by-variable"))
-      staging <- tempfile(src)
+      staging <- nr_staging_dir(out)
       DBI::dbExecute(con, sprintf("
         COPY (
           SELECT metric_id AS variable, * EXCLUDE (metric_id)
@@ -135,12 +135,10 @@ if (nr_stage("dashboard")) {
         ) TO '%s' (FORMAT parquet, COMPRESSION zstd,
                    PARTITION_BY (variable, scenario), FILENAME_PATTERN 'part-{i}')",
         file.path(DIR_DATA, src), staging))
-      for (v in pending_dash$item) {
-        dest <- file.path(out, paste0("variable=", v))
-        unlink(dest, recursive = TRUE)
-        dir.create(out, recursive = TRUE, showWarnings = FALSE)
-        file.rename(file.path(staging, paste0("variable=", v)), dest)
-      }
+      for (v in pending_dash$item)
+        nr_move_partition(file.path(staging, paste0("variable=", v)),
+                          file.path(out, paste0("variable=", v)))
+      unlink(staging, recursive = TRUE)
     }
     duckdb::dbDisconnect(con, shutdown = TRUE)
   }
