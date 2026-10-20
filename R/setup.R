@@ -5,7 +5,8 @@
 # options(repos = c(gamlss = "https://gamlss-dev.r-universe.dev",
 #                   CRAN = "https://cloud.r-project.org"))
 # pak::pak(c("magrittr", "tidyverse", "sf", "terra", "exactextractr", "arrow",
-#            "duckdb", "mirai", "carrier", "mgcv", "gamlss2", "gamlss.dist",
+#            "duckdb", "mirai", "carrier", "mgcv", "gamlss2", "gamlss",
+#            "gamlss.dist",
 #            "RcppRoll", "weathermetrics", "units", "openxlsx", "png", "ragg",
 #            "arcgislayers", "tigris", "processx", "digest", "jsonlite",
 #            "curl", "zip"), ask = FALSE)

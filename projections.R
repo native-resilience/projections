@@ -79,6 +79,20 @@ todo <-
 message("annual: ", nrow(pending_annual), " land × metric; smooth: ",
         nrow(pending_smooth), "; outputs: ", nrow(pending_outputs), " lands")
 
+# ---- Preflight: gamlss2 must actually fit here ----
+# Every failed fit falls back to empirical percentiles, so a broken install
+# (e.g. gamlss2 needing the gamlss package at fit time) would otherwise
+# "succeed" with no model fits at all.
+if (nrow(pending_smooth) > 0) {
+  probe <- tibble::tibble(Year = rep(1950:2100, 2), n_days = 365L,
+                          value = 50 + 0.02 * (Year - 1950) +
+                            stats::rnorm(302, sd = 0.5))
+  fit <- tryCatch(nr_smooth_fit(probe, "NO", "value"), error = function(e) e)
+  if (inherits(fit, "error"))
+    stop("gamlss2 cannot fit in this environment: ", conditionMessage(fit),
+         call. = FALSE)
+}
+
 # ---- Run, in batches so progress is recorded and pushed as we go ----
 # A batch's files are uploaded before its ledger rows are recorded, so an
 # interrupted run never claims work it did not publish. A land that fails is
@@ -101,6 +115,14 @@ if (nrow(todo) > 0) {
       status <- dplyr::summarise(status, n = sum(n), .by = status)
       message("smooth fit status (land-years): ",
               paste0(status$status, "=", status$n, collapse = ", "))
+      # Typically ~4% of land-years are empirical; far more means fits are
+      # failing wholesale, so stop before recording or publishing the batch.
+      share <- sum(status$n[status$status == "empirical"]) / sum(status$n)
+      if (share > 0.25)
+        stop(sprintf("%.0f%% of smoothed land-years fell back to empirical ",
+                     100 * share),
+             "percentiles; gamlss2 fits are failing. Batch not recorded.",
+             call. = FALSE)
     }
     if (nr_publish()) {
       s3_push(s3_bucket_name, file.path(s3_prefix, DIR_ANNUAL), DIR_ANNUAL, delete = FALSE)
