@@ -7,11 +7,13 @@
 # processx and stop() loudly on failure — no silent tryCatch.
 #
 # Auth: under GitHub Actions (OIDC via aws-actions/configure-aws-credentials),
-# ambient env credentials are used. Locally, AWS_PROFILE defaults to "mco".
+# or with S3_AMBIENT_CREDENTIALS=1 (e.g. an EC2 instance role), ambient
+# credentials are used. Locally, AWS_PROFILE defaults to "mco".
 
 s3_profile_args <- function() {
-  profile <- Sys.getenv("AWS_PROFILE",
-                        unset = if (nzchar(Sys.getenv("GITHUB_ACTIONS"))) "" else "mco")
+  ambient <- nzchar(Sys.getenv("GITHUB_ACTIONS")) ||
+    nzchar(Sys.getenv("S3_AMBIENT_CREDENTIALS"))
+  profile <- Sys.getenv("AWS_PROFILE", unset = if (ambient) "" else "mco")
   if (nzchar(profile)) c("--profile", profile) else character(0)
 }
 

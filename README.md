@@ -353,8 +353,11 @@ role allowed to write `s3://native-resilience/projections/*`, the
 
 ``` bash
 git clone https://github.com/native-resilience/projections && cd projections
-NR_WORKERS=28 Rscript projections-extract.R    # resumable; rerun after any interruption
+S3_AMBIENT_CREDENTIALS=1 NR_WORKERS=28 Rscript projections-extract.R    # resumable
 ```
+
+`S3_AMBIENT_CREDENTIALS=1` makes the S3 helpers use the instance role
+instead of the local `mco` SSO profile.
 
 Each finished model-year is written to S3 at once, so a spot instance
 can be interrupted and restarted without redoing work.
