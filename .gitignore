@@ -18,3 +18,8 @@ consumer-verify.mjs
 # projections-publish.R sha256 cache
 .sha256-cache.tsv
 publish*.log
+
+# Pipeline working tree (mirrored on s3://native-resilience/projections/)
+_cache
+_state
+data

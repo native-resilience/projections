@@ -1,26 +1,24 @@
 # projections-publish.R — publish the projections archive to S3.
 #
-# Mirrors upload/ (633 per-land zips + pdf/) and native-land.parquet to
+# Mirrors upload/ (per-land zips + pdf/), native-land.parquet and the data/
+# prefix (per-land and by-variable parquet, lookup tables) to
 # s3://native-resilience/projections/, served at
-# https://data.native-resilience.com/projections/. Run locally after
-# projections.R has rebuilt upload/:
+# https://data.native-resilience.com/projections/. Run after projections.R:
 #
 #   aws sso login --profile mco
 #   Rscript projections-publish.R
 #
+# S3_PREFIX=projections-staging publishes a dry-run copy for review first.
 # Re-runs are cheap: `aws s3 sync` skips files whose size and mtime match.
-# Sizes in upload/ were verified byte-for-byte against the original
-# data.climate.umt.edu/native-climate/projections/ host on 2026-10-04.
+# Old archive keys with no current land are reported, never deleted.
 
-source("R/s3-archive.R")
+source("R/setup.R")
 s3_preflight()
 
-s3_bucket_name <- Sys.getenv("S3_BUCKET", unset = "native-resilience")
-s3_prefix      <- Sys.getenv("S3_PREFIX", unset = "projections")
-staging        <- "upload"
+staging <- DIR_UPLOAD
 
 # ---- Mirror upload/ (zips at the prefix root, PDFs under pdf/) ----
-# delete = FALSE: the prefix also holds native-land.parquet and the
+# delete = FALSE: the prefix also holds data/, native-land.parquet and the
 # manifests, which are not in upload/.
 s3_push(s3_bucket_name, s3_prefix, staging, delete = FALSE)
 
@@ -31,9 +29,35 @@ s3_put(s3_bucket_name,
        cache_control = "max-age=3600")
 
 s3_verify(s3_bucket_name, s3_prefix, staging,
-          allow_extra = paste0(s3_prefix, c("/_manifest.txt",
-                                            "/native-land.parquet",
-                                            "/projections-manifest.json")))
+          allow_extra = character(0), expect_exact = FALSE)
+
+# ---- data/ (dashboard parquet) ----
+# projections.R pushes these as it goes; this is the full mirror + check.
+for (d in c("annual", "smoothed", "annual-by-variable", "smoothed-by-variable")) {
+  local <- file.path(DIR_DATA, d)
+  if (!dir.exists(local)) next
+  s3_push(s3_bucket_name, file.path(s3_prefix, "data", d), local, delete = FALSE)
+  s3_verify(s3_bucket_name, file.path(s3_prefix, "data", d), local,
+            allow_extra = character(0), expect_exact = FALSE)
+}
+for (f in c("variables.parquet", "lands.parquet"))
+  if (file.exists(file.path(DIR_DATA, f)))
+    s3_put(s3_bucket_name, file.path(s3_prefix, "data", f),
+           file.path(DIR_DATA, f),
+           content_type = "application/vnd.apache.parquet",
+           cache_control = "max-age=3600")
+
+# ---- Orphans: published zips/PDFs that no current land produces ----
+land_names <- sf::st_drop_geometry(sf::read_sf("native-land.parquet"))
+land_names <- land_names$name[land_names$modeled]
+expected <- c(paste0(s3_prefix, "/", gsub(" ", "_", land_names), ".zip"),
+              paste0(s3_prefix, "/pdf/", land_names, "_CMIP6-climate-projections.pdf"))
+remote <- s3_list_keys(s3_bucket_name, s3_prefix)$Key
+orphans <- remote[grepl(paste0("^", s3_prefix, "/(pdf/)?[^/]+\\.(zip|pdf)$"), remote) &
+                    !remote %in% expected]
+if (length(orphans))
+  message(length(orphans), " published file(s) no longer produced (not deleted):\n",
+          paste(orphans, collapse = "\n"))
 
 # ---- projections-manifest.json (path, size, sha256) ----
 # sha256 of ~114 GB takes a while, so hashes are cached by path + size + mtime.
@@ -98,6 +122,6 @@ s3_put(s3_bucket_name,
 
 s3_write_manifest(s3_bucket_name, s3_prefix)
 
-cf_invalidate(paste0("/", s3_prefix, c("/projections-manifest.json",
-                                       "/_manifest.txt",
-                                       "/native-land.parquet")))
+# Zips, PDFs and data files are overwritten in place on a rebuild, so drop
+# the whole prefix from the CDN (one wildcard path costs one invalidation).
+cf_invalidate(paste0("/", s3_prefix, "/*"))

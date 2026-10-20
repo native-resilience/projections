@@ -8,7 +8,7 @@
 #
 # Inputs:  native-land.parquet (built by projections.R)
 # Outputs: docs/data/native-land.geojson       (~2 MB, WGS84, 5 dp)
-#          docs/data/native-land-index.json    (id, slug, name, bbox)
+#          docs/data/native-land-index.json    (id, land_id, slug, name, bbox)
 #
 # Run from the repo root: Rscript projections-map.R
 
@@ -38,9 +38,12 @@ BASE <- "https://data.native-resilience.com/projections/"
 url_enc <- function(x) utils::URLencode(enc2utf8(x), reserved = FALSE)
 
 # ── Read ─────────────────────────────────────────────────────────────────────
+# Only modeled units (reservations, statistical areas, Navajo agencies and
+# Hawai‘i climate divisions) have workbooks and PDFs to link to.
 land <-
   sf::read_sf("native-land.parquet") %>%
-  dplyr::transmute(name = as.character(`Native Land`)) %>%
+  dplyr::filter(modeled) %>%
+  dplyr::transmute(land_id, name) %>%
   dplyr::arrange(name) %>%
   sf::st_transform(4326)
 
@@ -109,7 +112,7 @@ stopifnot(
 dir.create("docs/data", showWarnings = FALSE, recursive = TRUE)
 geojson_path <- "docs/data/native-land.geojson"
 simp %>%
-  dplyr::select(id, slug, name, label, pdf_url, zip_url) %>%
+  dplyr::select(id, land_id, slug, name, label, pdf_url, zip_url) %>%
   sf::st_write(geojson_path,
                driver = "GeoJSON",
                delete_dsn = file.exists(geojson_path),
@@ -130,7 +133,7 @@ index <-
   dplyr::mutate(bbox = lapply(sf::st_geometry(simp),
                               function(g) round(as.numeric(sf::st_bbox(g)), 4))) %>%
   sf::st_drop_geometry() %>%
-  dplyr::select(id, slug, name, label, pdf_url, zip_url, bbox)
+  dplyr::select(id, land_id, slug, name, label, pdf_url, zip_url, bbox)
 
 jsonlite::write_json(index,
                      "docs/data/native-land-index.json",

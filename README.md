@@ -15,7 +15,7 @@ https://data.native-resilience.com/projections/</strong>
 [*Native Resilience*](https://native-resilience.com) (formerly Native Climate) is a USDA NIFA-funded project to support climate
 adaptation efforts in Native American communities by building new
 connections between Native wisdom and Western scientific data. Through
-two-way information-sharing and relationship-building, Native Climate
+two-way information-sharing and relationship-building, Native Resilience
 aims to make climate data more accessible and useful to Tribes, and to
 build awareness nationally about climate impacts and resilience on
 Native lands. The project is led by the Desert Research Institute in
@@ -25,13 +25,13 @@ Arizona Tribal Extension, and the USDA Climate Hubs. The project team
 includes Tribal natural resource managers, agriculture producers, and
 climate leaders along with 1994 and 1862 Tribal Extension, researchers
 working in Indian Country, other federal and state climate service
-organizations, and a group of Native American advisors. *Native Climate*
+organizations, and a group of Native American advisors. *Native Resilience*
 is funded by the U.S. Department of Agriculture, National Institute of
 Food and Agriculture (USDA NIFA) and builds on the work of the [Native
 Waters on Arid Lands](https://nativewaters-aridlands.com/) project
 (2015–2022).
 
-Native Climate partners at the Montana Climate Office have extracted
+Native Resilience partners at the Montana Climate Office have extracted
 place-based climate data for Native American, Alaska Native, and Native
 Hawaiian lands located in the United States. Climate data and
 projections for temperature, precipitation, and other metrics related to
@@ -39,17 +39,27 @@ crop, livestock and forestry agriculture are shown in the accompanying
 graphs. The data derive from eight Coupled Model Intercomparison Project
 Phase 6 (CMIP6) global climate models and four socioeconomic scenarios
 for the period from 2015 to 2100, as well as the historical simulation
-for each model for the period 1950 to 2014. Raw data are extracted for
-the location of the reservation from the NASA Earth Exchange (NEX)
-Global Daily Downscaled Projections (GDDP) dataset (NEX-GDDP-CMIP6).
-Further information on the NASA NEX downscaled product, including
-descriptions of the projected climate variables, can be found at
+for each model for the period 1950 to 2014. Raw data are area-weighted
+averages over each land, extracted from version 2.0 of the NASA Earth
+Exchange (NEX) Global Daily Downscaled Projections (GDDP) dataset
+(NEX-GDDP-CMIP6 v2.0, 2025). Further information on the NASA NEX
+downscaled product, including descriptions of the projected climate
+variables, can be found at
 <https://www.nccs.nasa.gov/services/data-collections/land-based-products/nex-gddp-cmip6>.
+NASA cautions that downscaled values over smaller islands may not be
+realistic, because the observational data used for bias correction are
+not validated over oceans.
 
-Spatial data on Native lands were derived from the US Census TIGER/Line
-database, which includes all tribally controlled lands in the United
+Spatial data on Native lands were derived from the 2025 US Census
+TIGER/Line database (via the
+[census-aiannh](https://data.sustainable-fsa.com/census-aiannh/)
+archive), which includes all tribally controlled lands in the United
 States, as well as Alaska Native Village Statistical Areas (ANVSA) and
-State Designated Tribal Statistical Areas (SDTSA). We divided the Navajo
+State Designated Tribal Statistical Areas (SDTSA). Reservations and
+off-reservation trust lands (including Hawaiian Home Lands) are kept
+separate: daily data are extracted for both, and annual and smoothed
+projections, workbooks, and graphs are provided for reservations and
+statistical areas. We divided the Navajo
 Nation into its five agencies to better represent climate differences
 across the Nation. We used the recently defined climate divisions for
 the State of Hawai‘i ([Luo et al
@@ -60,9 +70,15 @@ Tabular data for all graphs included here are available in the
 accompanying Microsoft Excel workbook. We aggregated daily data from
 each model and scenario into seasonal or annual statistics (the **Annual
 Projections** worksheet), and then we combined the results from the
-eight models using a generalized additive model (the **Smoothed
-Projections** worksheet). We provide raw daily data for each scenario in
-the **Raw** worksheets.
+eight models using a generalized additive model for location, scale and
+shape (GAMLSS, fit with the [gamlss2](https://github.com/gamlss-dev/gamlss2)
+R package; the **Smoothed Projections** worksheet). For each scenario and
+variable, the annual values of all eight models are fit with a
+distribution whose parameters change smoothly over time, and we report
+the median and the 5th, 25th, 75th and 95th percentiles of that
+distribution in each year, so the ranges reflect both differences among
+models and year-to-year variability. We provide raw daily data for each
+scenario in the **Raw** worksheets.
 
 The CMIP6 data include projections for four scenarios for how global
 society, demographics and economics might change over the next century,
@@ -246,7 +262,8 @@ below 50 ºF</td>
 <td>Normal Length of Growing Season</td>
 <td>days</td>
 <td>Number of days between the first and last days of the growing
-season</td>
+season; zero in years when the normal temperature never stays above
+50 ºF for six days</td>
 </tr>
 <tr>
 <td>Day of First Snow</td>
@@ -259,16 +276,31 @@ with frozen precipitation</td>
 
 ## Data archive
 
-The per-land zips and PDF reports are archived in the public S3 bucket
-`s3://native-resilience` (us-west-2) under `projections/`, served at
-<https://data.native-resilience.com/projections/>:
+The per-land zips, PDF reports and dashboard data are archived in the
+public S3 bucket `s3://native-resilience` (us-west-2) under
+`projections/`, served at <https://data.native-resilience.com/projections/>:
 
-- `<Native_Land_Name>.zip` — the XLSX workbook and PDF report for one land
-  (spaces in the name become underscores).
+- `<Native_Land_Name>.zip` — the XLSX workbook, PDF report and PNG graphs
+  for one land (spaces in the name become underscores).
 - `pdf/<Native Land Name>_CMIP6-climate-projections.pdf` — the PDF report alone.
-- `native-land.parquet` — the GeoParquet boundaries of all 633 lands.
-- `projections-manifest.json` — every file with its size and sha256;
-  `_manifest.txt` — one download URL per line.
+- `native-land.parquet` — GeoParquet boundaries of every unit: 633 modeled
+  lands plus 250 off-reservation trust lands and Hawaiian Home Lands.
+  `land_id` is the Census GEOID (`2430R-<agency>` for the Navajo agencies,
+  `HI-<nn>` for the Hawai‘i climate divisions); `modeled` marks the units
+  with projections.
+- `data/` — hive-partitioned parquet for dashboards:
+  - `daily/land_id=…/` — raw daily NEX-GDDP-CMIP6 values in NASA's native
+    units (K, kg m⁻² s⁻¹, m s⁻¹, %, kg/kg, W m⁻²), every unit.
+  - `annual/land_id=…/` and `smoothed/land_id=…/` — annual metrics per
+    model, and the GAMLSS percentiles (`p05`…`p95`), in US units, one land
+    per partition.
+  - `annual-by-variable/variable=…/scenario=…/` and
+    `smoothed-by-variable/…` — the same tables partitioned for maps of one
+    variable across all lands.
+  - `variables.parquet` (variable id → label, family, type) and
+    `lands.parquet` (land id → name).
+- `projections-manifest.json` — every file with its size (and sha256 for
+  the zips and PDFs); `_manifest.txt` — one download URL per line.
 
 No credentials are needed:
 
@@ -277,11 +309,64 @@ aws s3 ls s3://native-resilience/projections/ --no-sign-request
 aws s3 cp "s3://native-resilience/projections/pdf/Acoma Pueblo_CMIP6-climate-projections.pdf" . --no-sign-request
 ```
 
-`projections.R` builds `upload/` locally; `Rscript projections-publish.R`
-(with `aws sso login --profile mco`) mirrors it to the bucket, verifies
-every file, and rewrites the manifests. The original host,
-`data.climate.umt.edu/native-climate/projections/`, still serves the same
-files.
+``` sql
+-- DuckDB: one land, every variable
+SELECT * FROM read_parquet(
+  'https://data.native-resilience.com/projections/data/smoothed/land_id=0305R/part-0.parquet');
+
+-- DuckDB: one variable across all lands
+SELECT land_id, Year, p50 FROM read_parquet(
+  'https://data.native-resilience.com/projections/data/smoothed-by-variable/variable=temp_mean/scenario=ssp245/part-0.parquet');
+```
+
+## Running the pipeline
+
+| Script | What it does |
+|----|----|
+| `projections-boundaries.R` | Builds `native-land.parquet` from the latest census-aiannh vintage, the Navajo agencies and the Hawai‘i climate divisions |
+| `projections-extract.R` | Extracts NEX-GDDP-CMIP6 for every unit and assembles `data/daily/`. Run on EC2 in us-west-2 next to `s3://nex-gddp-cmip6` |
+| `projections.R` | Annual metrics, gamlss2 smooths, workbooks, graphs, zips and the dashboard tables |
+| `projections-families.R` | Compares candidate distribution families per variable on a sample of lands (`_state/family-selection.csv`) |
+| `projections-publish.R` | Mirrors `upload/` and `data/` to S3, verifies, writes the manifests and invalidates the CDN |
+| `projections-map.R` | Writes the web map's GeoJSON and search index |
+
+Every stage is incremental. A ledger of fingerprints
+(`_state/ledger.parquet`, mirrored to S3) records what each output was
+built from: NASA's file checksums and each land's geometry for the
+extraction, the metric definition and the smoothing settings for the
+annual and smoothed tables. A rerun does only what changed. Environment
+variables steer a run:
+
+- `NR_STAGES` — e.g. `annual,smooth` (default: every stage of the script)
+- `NR_LANDS` — comma list of `land_id`s
+- `NR_FORCE` — stages to rebuild regardless of the ledger
+- `NR_WORKERS` — parallel workers ([mirai](https://mirai.r-lib.org)
+  daemons driven by `purrr::in_parallel()`)
+- `PUBLISH=0` — build locally without reading or writing S3
+
+**Extraction on EC2.** The full extraction reads ~29,000 yearly global
+NetCDF files (~7 TB) for the eight models, so it runs in us-west-2, where
+reading `s3://nex-gddp-cmip6` is free and fast. A memory-heavy instance
+(e.g. `m7i.8xlarge`, 32 vCPU / 128 GB, ~4 GB per worker) with an instance
+role allowed to write `s3://native-resilience/projections/*`, the
+`rocker/geospatial` image and the AWS CLI is enough:
+
+``` bash
+git clone https://github.com/native-resilience/projections && cd projections
+NR_WORKERS=28 Rscript projections-extract.R    # resumable; rerun after any interruption
+```
+
+Each finished model-year is written to S3 at once, so a spot instance
+can be interrupted and restarted without redoing work.
+`NR_TASKS="GFDL-ESM4/ssp245/2097"` limits a run to matching
+model/scenario/year tasks for a smoke test.
+
+**Adding a metric.** Append one `metric()` entry to `R/metrics.R` (an id,
+label, an expression over the day's data in US units, a distribution
+family and type) and rerun `projections.R`. Only the new metric is
+computed, smoothed, added to every workbook and graph set, and written to
+the dashboard tables. Bump a metric's `version` when its definition
+changes to rebuild it everywhere.
 
 ## Web map
 
@@ -297,7 +382,7 @@ pinned at `@0.6.0`) and uses MapLibre GL 5 with the CARTO vector basemaps.
 - `docs/data/native-land.geojson` and `docs/data/native-land-index.json` —
   simplified boundaries and the search index, written by
   `projections-map.R` from `native-land.parquet` (itself built by
-  `projections.R`). Re-run `Rscript projections-map.R` whenever the
+  `projections-boundaries.R`). Re-run `Rscript projections-map.R` whenever the
   boundaries change; add `--check-links` to HEAD-check every
   PDF and zip URL.
 - Preview locally with `python3 -m http.server 8000 --directory docs`.
