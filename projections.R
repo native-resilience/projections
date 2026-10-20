@@ -80,12 +80,22 @@ message("annual: ", nrow(pending_annual), " land × metric; smooth: ",
         nrow(pending_smooth), "; outputs: ", nrow(pending_outputs), " lands")
 
 # ---- Run, in batches so progress is recorded and pushed as we go ----
+# A batch's files are uploaded before its ledger rows are recorded, so an
+# interrupted run never claims work it did not publish. A land that fails is
+# reported and left pending; the script exits non-zero at the end.
+lands_failed <- character(0)
 if (nrow(todo) > 0) {
   batches <- split(seq_len(nrow(todo)), ceiling(seq_len(nrow(todo)) / 48))
   for (b in batches) {
-    res <- nr_map(b, \(i) process_land(todo[i, ], publish),
-                  todo = todo, publish = nr_publish())
-    ledger_record(dplyr::bind_rows(purrr::map(res, "rows")))
+    res <- nr_map(b, \(i) tryCatch(
+      process_land(todo[i, ], publish),
+      error = function(e) list(failed = todo$land_id[i], error = nr_root_message(e))),
+      todo = todo, publish = nr_publish())
+    failed <- purrr::keep(res, \(r) !is.null(r$failed))
+    res <- purrr::discard(res, \(r) !is.null(r$failed))
+    for (f in failed) message("land failed (stays pending): ", f$failed, ": ", f$error)
+    lands_failed <- c(lands_failed, purrr::map_chr(failed, "failed"))
+
     status <- dplyr::bind_rows(purrr::map(res, "status"))
     if (nrow(status) > 0) {
       status <- dplyr::summarise(status, n = sum(n), .by = status)
@@ -95,8 +105,16 @@ if (nrow(todo) > 0) {
     if (nr_publish()) {
       s3_push(s3_bucket_name, file.path(s3_prefix, DIR_ANNUAL), DIR_ANNUAL, delete = FALSE)
       s3_push(s3_bucket_name, file.path(s3_prefix, DIR_SMOOTH), DIR_SMOOTH, delete = FALSE)
-      nr_state_push()
+      if (dir.exists(DIR_UPLOAD)) {
+        s3_push(s3_bucket_name, NR_UPLOAD_PREFIX, DIR_UPLOAD, delete = FALSE)
+        if (!nr_keep_outputs())
+          unlink(list.files(DIR_UPLOAD, recursive = TRUE, full.names = TRUE))
+      }
     }
+    ledger_record(dplyr::bind_rows(purrr::map(res, "rows")))
+    nr_state_push()
+    message(format(Sys.time(), "%H:%M"), " batch done: ",
+            length(res), " lands ok, ", length(failed), " failed")
   }
 }
 
@@ -172,3 +190,8 @@ if (nr_stage("dashboard")) {
 }
 
 # Publish upload/ and the data/ prefix with: Rscript projections-publish.R
+
+if (length(lands_failed))
+  stop(length(lands_failed), " land(s) failed: ",
+       paste(lands_failed, collapse = ", "), "; rerun to retry them",
+       call. = FALSE)

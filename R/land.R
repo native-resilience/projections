@@ -79,6 +79,8 @@ process_land <- function(land, publish) {
     on.exit(setwd(old_wd), add = TRUE)
     nr_zip_land(c(basename(xlsx), basename(pdf), file.path("png", list.files("png"))),
                 zipfile)
+    setwd(old_wd)
+    if (!nr_keep_outputs()) unlink(dir, recursive = TRUE)
   }
 
   status <- if (!is.null(smoothed)) dplyr::count(smoothed, status) else NULL

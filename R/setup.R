@@ -57,9 +57,16 @@ nr_workers <- function() {
 
 nr_publish <- function() Sys.getenv("PUBLISH", unset = "1") != "0"
 
+# NR_KEEP_OUTPUTS=0 deletes each land's workbook/graphs and the uploaded
+# zips/PDFs locally once they are on S3 (for disk-limited cloud runs).
+nr_keep_outputs <- function() Sys.getenv("NR_KEEP_OUTPUTS", unset = "1") != "0"
+
 # ---- S3 ----
 s3_bucket_name <- Sys.getenv("S3_BUCKET", unset = "native-resilience")
 s3_prefix      <- Sys.getenv("S3_PREFIX", unset = "projections")
+# Where projections.R uploads zips and PDFs as it goes; set to e.g.
+# "projections/_staging" to review a rebuild before it replaces the archive.
+NR_UPLOAD_PREFIX <- Sys.getenv("NR_UPLOAD_PREFIX", unset = s3_prefix)
 nr_base_url    <- paste0(Sys.getenv("CLOUDFRONT_BASE",
                                     unset = "https://data.native-resilience.com"),
                          "/", s3_prefix, "/")
