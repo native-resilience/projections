@@ -10,9 +10,31 @@ nex_open <- function(key, access) {
                 file = NULL))
   }
   f <- tempfile(fileext = ".nc")
-  processx::run("aws", c("s3", "cp", paste0("s3://", NEX_BUCKET, "/", key), f,
-                         "--no-sign-request", "--only-show-errors"))
+  nr_retry(processx::run("aws", c("s3", "cp", paste0("s3://", NEX_BUCKET, "/", key),
+                                  f, "--no-sign-request", "--only-show-errors")),
+           what = key)
   list(rast = terra::rast(f), file = f)
+}
+
+# Innermost cause of a (possibly chained) condition as plain text. Formatting
+# the outer rlang/purrr error inside a daemon can garble it.
+nr_root_message <- function(e) {
+  while (!is.null(e$parent)) e <- e$parent
+  paste(conditionMessage(e), collapse = " ")
+}
+
+# Retry a flaky network call (S3 throttling, dropped connections) with
+# backoff; the final error carries the command's stderr.
+nr_retry <- function(expr, tries = 4, pause = 5, what = "") {
+  expr <- substitute(expr)
+  env <- parent.frame()
+  for (i in seq_len(tries)) {
+    res <- tryCatch(eval(expr, env), error = function(e) e)
+    if (!inherits(res, "error")) return(res)
+    if (i < tries) Sys.sleep(pause * i)
+  }
+  detail <- if (!is.null(res$stderr)) trimws(res$stderr) else conditionMessage(res)
+  stop("failed after ", tries, " tries: ", what, ": ", detail, call. = FALSE)
 }
 
 # Rotated boundaries are written to disk once by the main process; each
@@ -38,7 +60,10 @@ extract_task <- function(item, lands_file, access, outdir, publish) {
   lands <- sf::st_drop_geometry(lands_rot)
   e <- terra::ext(sf::st_bbox(lands_rot)) + 0.5
 
-  vals <- purrr::map(stats::setNames(NEX_VARIABLES, NEX_VARIABLES), \(v) {
+  # Base lapply, not purrr::map: inside an in_parallel() daemon, purrr's
+  # error wrapping fails while capturing a backtrace ("bad value") and
+  # hides the real error.
+  vals <- lapply(stats::setNames(NEX_VARIABLES, NEX_VARIABLES), \(v) {
     key <- task$files$key[task$files$variable == v]
     if (length(key) == 0) return(NULL)   # e.g. MIROC6 huss
     src <- nex_open(key, access)
@@ -70,8 +95,9 @@ extract_task <- function(item, lands_file, access, outdir, publish) {
   dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
   arrow::write_parquet(out, dest, compression = "zstd")
   if (publish)
-    s3_put(s3_bucket_name, file.path(s3_prefix, DIR_CACHE, rel), dest,
-           content_type = "application/vnd.apache.parquet")
+    nr_retry(s3_put(s3_bucket_name, file.path(s3_prefix, DIR_CACHE, rel), dest,
+                    content_type = "application/vnd.apache.parquet"),
+             what = rel)
 
   tibble::tibble(stage = "extract", land_id = landset, item = task$task_id,
                  key = task$task_key)

@@ -86,17 +86,25 @@ extract_done <- function(ledger = ledger_read()) {
 current_lands <- sf::st_drop_geometry(lands)[, c("land_id", "geom_hash")]
 
 # ---- Stage: extract ----
+# A task that still fails after its retries is logged and left pending; the
+# stage makes up to three passes, so transient S3 errors heal themselves.
+# Anything still missing makes the script exit non-zero at the end.
+extract_failed <- 0L
 if (nr_stage("extract")) {
-  done <- if (nr_force("extract")) extract_done()[0, ] else extract_done()
-  need <-
-    tasks %>%
-    dplyr::select(task_id, task_key) %>%
-    tidyr::crossing(current_lands) %>%
-    dplyr::anti_join(done, by = c("task_id", "task_key", "land_id", "geom_hash"))
+  for (pass in 1:3) {
+    done <- if (nr_force("extract") && pass == 1) extract_done()[0, ] else extract_done()
+    need <-
+      tasks %>%
+      dplyr::select(task_id, task_key) %>%
+      tidyr::crossing(current_lands) %>%
+      dplyr::anti_join(done, by = c("task_id", "task_key", "land_id", "geom_hash"))
 
-  if (nrow(need) == 0) {
-    message("extract: nothing to do")
-  } else {
+    if (nrow(need) == 0) {
+      message("extract: nothing to do")
+      extract_failed <- 0L
+      break
+    }
+
     # Group tasks that are missing the same lands so they share a landset.
     plan <-
       need %>%
@@ -114,13 +122,14 @@ if (nr_stage("extract")) {
       dplyr::distinct() %>%
       arrow::write_parquet(LANDSETS_FILE)
 
-    message("extract: ", nrow(plan), " tasks for ",
+    message("extract (pass ", pass, "): ", nrow(plan), " tasks for ",
             dplyr::n_distinct(need$land_id), " lands")
 
     access <- Sys.getenv("NR_NEX_ACCESS", unset = "download")
     landset_ids <- split(landsets_new$land_id, landsets_new$landset)
     lands_file <- normalizePath(".nr-lands-rotated.rds", mustWork = FALSE)
     saveRDS(st_rotate(lands), lands_file)
+    extract_failed <- 0L
     batches <- split(seq_len(nrow(plan)), ceiling(seq_len(nrow(plan)) / 200))
     for (b in batches) {
       # Each element carries only its own task; the boundaries go through
@@ -134,12 +143,24 @@ if (nr_stage("extract")) {
       })
       rows <- nr_map(
         items,
-        \(item) extract_task(item, lands_file, access, DIR_CACHE, publish),
+        \(item) tryCatch(
+          extract_task(item, lands_file, access, DIR_CACHE, publish),
+          # Daemon output is not captured, so failures travel back as rows.
+          error = function(e)
+            tibble::tibble(stage = "failed", land_id = item$landset,
+                           item = item$task$task_id, key = nr_root_message(e))),
         lands_file = lands_file, access = access, publish = nr_publish()
       )
-      ledger_record(dplyr::bind_rows(rows))
+      rows <- dplyr::bind_rows(rows)
+      failed <- dplyr::filter(rows, stage == "failed")
+      extract_failed <- extract_failed + nrow(failed)
+      for (i in seq_len(nrow(failed)))
+        message("extract failed (stays pending): ", failed$item[i], ": ",
+                failed$key[i])
+      ledger_record(dplyr::filter(rows, stage != "failed"))
       nr_state_push()
     }
+    if (extract_failed == 0L) break
   }
 }
 
@@ -219,3 +240,7 @@ if (nr_stage("daily")) {
     nr_state_push()
   }
 }
+
+if (extract_failed > 0L)
+  stop(extract_failed, " extraction task(s) still failing after 3 passes; ",
+       "rerun to retry them")
