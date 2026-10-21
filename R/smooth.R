@@ -68,7 +68,10 @@ nr_smooth_quantiles <- function(fit, family, type, years, probs = SMOOTH_PROBS) 
     par <- stats::setNames(data.frame(par), fit$family$names[[1]])
   qfun <- get(paste0("q", family), envir = asNamespace("gamlss.dist"))
   extra <- if (family %in% BINOMIAL_FAMILIES) list(bd = nd$n_days) else list()
-  out <- purrr::map(probs, \(p) do.call(qfun, c(list(p = p), as.list(par), extra)))
+  # Quantile functions warn about clamped parameters (e.g. tiny BB sigma);
+  # the clamp is what we want, so muffle them where they are raised.
+  out <- lapply(probs, \(p) suppressWarnings(
+    do.call(qfun, c(list(p = p), as.list(par), extra))))
   out <- tibble::as_tibble(out)
   if (type == "count" && !family %in% BINOMIAL_FAMILIES)
     out <- out * 365
@@ -88,7 +91,7 @@ nr_per_year <- function(data, type) {
 nr_smooth_empirical <- function(data, type, years, probs = SMOOTH_PROBS,
                                 halfwidth = 10) {
   v <- nr_per_year(data, type)
-  out <- purrr::map(years, \(y) {
+  out <- lapply(years, \(y) {
     w <- v[abs(data$Year - y) <= halfwidth]
     stats::quantile(w, probs, names = FALSE, na.rm = TRUE)
   })
@@ -124,76 +127,84 @@ smooth_const <- function(years, value) {
 # empirical (no family could fit) or no_data.
 nr_smooth_land <- function(annual, metrics = METRICS, land_id = NA_character_) {
   years <- sort(unique(annual$Year))
-  annual %>%
-    dplyr::filter(metric_id %in% names(metrics)) %>%
-    dplyr::summarise(data = list(dplyr::pick(Year, n_days, value)),
-                     .by = c(scenario, metric_id)) %>%
-    dplyr::mutate(
-      smooth = purrr::pmap(list(data, metric_id, scenario), \(data, id, scn) {
-        m <- metrics[[id]]
-        data <- dplyr::filter(data, !is.na(value))
-        status <- "ok"
+  annual <- annual[annual$metric_id %in% names(metrics), ]
+  # Plain base R around the fits: a dplyr verb here would route every
+  # warning from a fit through dplyr's warning collector, which captures a
+  # backtrace; that capture fails inside in_parallel() daemons and the
+  # resulting error escapes the per-series fallbacks below.
+  groups <- split(annual[c("Year", "n_days", "value")],
+                  list(annual$scenario, annual$metric_id), drop = TRUE, sep = "\r")
+  out <- lapply(names(groups), \(g) {
+    key <- strsplit(g, "\r", fixed = TRUE)[[1]]
+    q <- nr_smooth_series(groups[[g]], metrics[[key[[2]]]], years,
+                          label = paste(land_id, key[[1]], key[[2]], sep = " / "))
+    q$scenario <- key[[1]]
+    q$metric_id <- key[[2]]
+    q
+  })
+  out <- dplyr::bind_rows(out)
+  out$metric_version <- purrr::map_int(metrics, "version")[out$metric_id]
+  out$smooth_version <- SMOOTH_SPEC_VERSION
+  out <- out[order(out$metric_id, out$scenario, out$Year),
+             c("scenario", "metric_id", "metric_version", "smooth_version", "Year",
+               names(SMOOTH_PROBS), "family", "status")]
+  tibble::as_tibble(out)
+}
+
+# Smooth one scenario × metric series: the metric's families in order, then
+# empirical percentiles. Returns Year, the percentiles, family and status.
+nr_smooth_series <- function(data, m, years, label = "") {
+  data <- data[!is.na(data$value), ]
+  status <- "ok"
+  q <- NULL
+  used <- m$family[[1]]
+  if (nrow(data) == 0) {
+    status <- "no_data"
+  } else if (length(unique(nr_per_year(data, m$type))) == 1) {
+    # A constant series (no 100 ºF days ever; a growing season that is
+    # always the whole year) needs no fit.
+    status <- "constant"
+    q <- smooth_const(years, nr_per_year(data, m$type)[[1]])
+  } else {
+    # Try the metric's families in order; later ones are fallbacks (e.g.
+    # ZAGA when a gamma-type family meets a zero). A pathological series must
+    # not stall a worker: each family's fit + quantiles is time-capped.
+    for (fam in m$family) {
+      q <- tryCatch(
+        with_time_limit(
+          nr_smooth_quantiles(nr_smooth_fit(data, fam, m$type), fam, m$type, years),
+          SMOOTH_TIME_LIMIT),
+        error = function(e) {
+          message("gamlss2 fit failed: ", label, " (", fam, "): ", conditionMessage(e))
+          NULL
+        })
+      if (!is.null(q) && !nr_smooth_plausible(q, data, m$type)) {
+        message("gamlss2 fit implausible: ", label, " (", fam, ")")
         q <- NULL
-        used <- m$family[[1]]
-        if (nrow(data) == 0) {
-          status <- "no_data"
-        } else if (length(unique(nr_per_year(data, m$type))) == 1) {
-          # A constant series (no 100 ºF days ever; a growing season that is
-          # always the whole year) needs no fit.
-          status <- "constant"
-          q <- smooth_const(years, nr_per_year(data, m$type)[[1]])
-        } else {
-          # Try the metric's families in order; later ones are fallbacks
-          # (e.g. ZAGA when a gamma-type family meets a zero).
-          status <- "failed"
-          for (fam in m$family) {
-            # A pathological series must not stall a worker: cap each
-            # family's fit + quantiles and fall through to the next.
-            q <- tryCatch(
-              with_time_limit(
-                nr_smooth_quantiles(nr_smooth_fit(data, fam, m$type),
-                                    fam, m$type, years),
-                SMOOTH_TIME_LIMIT),
-              error = function(e) {
-                message("gamlss2 fit failed: ", land_id, " / ", scn, " / ", id,
-                        " (", fam, "): ", conditionMessage(e))
-                NULL
-              })
-            if (!is.null(q) && !nr_smooth_plausible(q, data, m$type)) {
-              message("gamlss2 fit implausible: ", land_id, " / ", scn, " / ",
-                      id, " (", fam, ")")
-              q <- NULL
-            }
-            if (!is.null(q)) {
-              status <- if (fam == m$family[[1]]) "ok" else "fallback"
-              used <- fam
-              break
-            }
-            q <- NULL
-          }
-          # Too sparse for any family (e.g. a handful of extreme-danger heat
-          # days across all models): empirical percentiles of every model's
-          # values within ±10 years.
-          if (is.null(q)) {
-            q <- nr_smooth_empirical(data, m$type, years)
-            status <- "empirical"
-            used <- "empirical"
-          }
-        }
-        if (is.null(q))
-          q <- smooth_const(years, NA_real_)
-        if (!is.null(m$bounds))
-          q <- dplyr::mutate(q, dplyr::across(-Year, \(x) pmin(pmax(x, m$bounds[[1]]),
-                                                                m$bounds[[2]])))
-        dplyr::mutate(q, family = used, status = status)
-      })
-    ) %>%
-    dplyr::select(scenario, metric_id, smooth) %>%
-    tidyr::unnest(smooth) %>%
-    dplyr::mutate(metric_version = purrr::map_int(metrics, "version")[metric_id],
-                  smooth_version = SMOOTH_SPEC_VERSION,
-                  .after = metric_id) %>%
-    dplyr::arrange(metric_id, scenario, Year)
+      }
+      if (!is.null(q)) {
+        status <- if (fam == m$family[[1]]) "ok" else "fallback"
+        used <- fam
+        break
+      }
+    }
+    # Too sparse for any family (e.g. a handful of extreme-danger heat days
+    # across all models): empirical percentiles of every model's values
+    # within ±10 years.
+    if (is.null(q)) {
+      q <- nr_smooth_empirical(data, m$type, years)
+      status <- "empirical"
+      used <- "empirical"
+    }
+  }
+  if (is.null(q))
+    q <- smooth_const(years, NA_real_)
+  if (!is.null(m$bounds))
+    for (p in names(SMOOTH_PROBS))
+      q[[p]] <- pmin(pmax(q[[p]], m$bounds[[1]]), m$bounds[[2]])
+  q$family <- used
+  q$status <- status
+  q
 }
 
 # Generalised AIC of each candidate family for one series, for family
