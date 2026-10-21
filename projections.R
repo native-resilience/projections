@@ -169,15 +169,28 @@ if (nr_stage("dashboard")) {
     for (src in c("annual", "smoothed")) {
       out <- file.path(DIR_DATA, paste0(src, "-by-variable"))
       staging <- nr_staging_dir(out)
+      # One file per variable × scenario (part-0.parquet): load once, then
+      # write each partition explicitly. A partitioned COPY may split a
+      # partition across several files when it writes in parallel.
       DBI::dbExecute(con, sprintf("
-        COPY (
+        CREATE OR REPLACE TEMP TABLE bv AS
           SELECT metric_id AS variable, * EXCLUDE (metric_id)
           FROM read_parquet('%s/*/*.parquet', hive_partitioning = true)
-          WHERE metric_id IN (SELECT metric_id FROM pending)
-          ORDER BY variable, scenario, land_id, Year
-        ) TO '%s' (FORMAT parquet, COMPRESSION zstd,
-                   PARTITION_BY (variable, scenario), FILENAME_PATTERN 'part-{i}')",
-        file.path(DIR_DATA, src), staging))
+          WHERE metric_id IN (SELECT metric_id FROM pending)",
+        file.path(DIR_DATA, src)))
+      parts <- DBI::dbGetQuery(con, "SELECT DISTINCT variable, scenario FROM bv")
+      for (i in seq_len(nrow(parts))) {
+        dest <- file.path(staging, paste0("variable=", parts$variable[i]),
+                          paste0("scenario=", parts$scenario[i]))
+        dir.create(dest, recursive = TRUE, showWarnings = FALSE)
+        DBI::dbExecute(con, sprintf("
+          COPY (
+            SELECT * EXCLUDE (variable, scenario) FROM bv
+            WHERE variable = '%s' AND scenario = '%s'
+            ORDER BY land_id, Year
+          ) TO '%s' (FORMAT parquet, COMPRESSION zstd)",
+          parts$variable[i], parts$scenario[i], file.path(dest, "part-0.parquet")))
+      }
       for (v in pending_dash$item)
         nr_move_partition(file.path(staging, paste0("variable=", v)),
                           file.path(out, paste0("variable=", v)))
