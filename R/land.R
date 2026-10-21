@@ -7,7 +7,7 @@ land_part <- function(dir, id) file.path(dir, paste0("land_id=", id), "part-0.pa
 land_pull <- function(dir, id, publish) {
   f <- land_part(dir, id)
   if (publish && !file.exists(f))
-    s3_pull(s3_bucket_name, file.path(s3_prefix, dirname(f)), dirname(f))
+    s3_pull(s3_bucket_name, nr_data_key(dirname(f)), dirname(f))
   if (file.exists(f)) arrow::read_parquet(f) else NULL
 }
 

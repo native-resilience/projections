@@ -107,6 +107,14 @@ DIR_SMOOTH <- file.path(DIR_DATA, "smoothed")
 DIR_OUTPUT <- Sys.getenv("NR_OUTPUT_DIR", unset = "output")  # per-land xlsx/pdf/png
 DIR_UPLOAD <- Sys.getenv("NR_UPLOAD_DIR", unset = "upload")  # published zips and pdf/
 
+# S3 key for a local folder under DIR_DATA (which may be anywhere, via
+# NR_DATA_DIR); on S3 it always lives under <prefix>/data/.
+nr_data_key <- function(local) {
+  prefix <- paste0(DIR_DATA, "/")
+  stopifnot("not under DIR_DATA" = startsWith(local, prefix))
+  file.path(s3_prefix, "data", substring(local, nchar(prefix) + 1))
+}
+
 # Bump to force the matching stage to rebuild everywhere.
 SMOOTH_SPEC_VERSION <- 1L
 OUTPUT_SPEC_VERSION <- 2L   # 2: web address on every graph

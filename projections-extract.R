@@ -245,9 +245,9 @@ if (nr_stage("daily")) {
            call. = FALSE)
 
     if (nr_publish()) {
-      s3_push(s3_bucket_name, file.path(s3_prefix, DIR_DAILY), DIR_DAILY,
+      s3_push(s3_bucket_name, nr_data_key(DIR_DAILY), DIR_DAILY,
               delete = FALSE)
-      s3_verify(s3_bucket_name, file.path(s3_prefix, DIR_DAILY), DIR_DAILY,
+      s3_verify(s3_bucket_name, nr_data_key(DIR_DAILY), DIR_DAILY,
                 allow_extra = character(0), expect_exact = FALSE)
     }
     ledger_record(pending)

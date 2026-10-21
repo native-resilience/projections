@@ -128,8 +128,8 @@ if (nrow(todo) > 0) {
              call. = FALSE)
     }
     if (nr_publish()) {
-      s3_push(s3_bucket_name, file.path(s3_prefix, DIR_ANNUAL), DIR_ANNUAL, delete = FALSE)
-      s3_push(s3_bucket_name, file.path(s3_prefix, DIR_SMOOTH), DIR_SMOOTH, delete = FALSE)
+      s3_push(s3_bucket_name, nr_data_key(DIR_ANNUAL), DIR_ANNUAL, delete = FALSE)
+      s3_push(s3_bucket_name, nr_data_key(DIR_SMOOTH), DIR_SMOOTH, delete = FALSE)
       if (dir.exists(DIR_UPLOAD)) {
         s3_push(s3_bucket_name, NR_UPLOAD_PREFIX, DIR_UPLOAD, delete = FALSE)
         if (!nr_keep_outputs())
@@ -159,8 +159,8 @@ if (nr_stage("dashboard")) {
 
   if (nrow(pending_dash) > 0) {
     if (nr_publish()) {
-      s3_pull(s3_bucket_name, file.path(s3_prefix, DIR_ANNUAL), DIR_ANNUAL)
-      s3_pull(s3_bucket_name, file.path(s3_prefix, DIR_SMOOTH), DIR_SMOOTH)
+      s3_pull(s3_bucket_name, nr_data_key(DIR_ANNUAL), DIR_ANNUAL)
+      s3_pull(s3_bucket_name, nr_data_key(DIR_SMOOTH), DIR_SMOOTH)
     }
     con <- duckdb::dbConnect(duckdb::duckdb())
     DBI::dbExecute(con, paste0("SET threads = ", nr_workers()))
@@ -199,13 +199,15 @@ if (nr_stage("dashboard")) {
     duckdb::dbDisconnect(con, shutdown = TRUE)
   }
 
-  # Metrics removed from the registry lose their partitions (and are deleted
-  # from S3 by the delete-mirror push below).
-  for (d in file.path(DIR_DATA, c("annual-by-variable", "smoothed-by-variable"))) {
-    stale <- setdiff(list.files(d), paste0("variable=", names(METRICS)))
-    unlink(file.path(d, stale), recursive = TRUE)
-  }
+  # Metrics removed from the registry lose their partitions, locally and on
+  # S3. The S3 copy is never mirror-deleted from the local folder: a fresh
+  # machine holds only the variables it just rebuilt.
+  by_var <- c("annual-by-variable", "smoothed-by-variable")
+  keep <- paste0("variable=", names(METRICS))
+  for (d in file.path(DIR_DATA, by_var))
+    unlink(file.path(d, setdiff(list.files(d), keep)), recursive = TRUE)
 
+  dir.create(DIR_DATA, recursive = TRUE, showWarnings = FALSE)
   metrics_table() %>%
     dplyr::rename(variable = metric_id) %>%
     arrow::write_parquet(file.path(DIR_DATA, "variables.parquet"))
@@ -214,11 +216,19 @@ if (nr_stage("dashboard")) {
     arrow::write_parquet(file.path(DIR_DATA, "lands.parquet"))
 
   if (nr_publish()) {
-    for (d in c("annual-by-variable", "smoothed-by-variable"))
-      s3_push(s3_bucket_name, file.path(s3_prefix, DIR_DATA, d),
-              file.path(DIR_DATA, d), delete = TRUE)
+    for (d in by_var) {
+      if (nrow(pending_dash) > 0)
+        s3_push(s3_bucket_name, file.path(s3_prefix, "data", d),
+                file.path(DIR_DATA, d), delete = FALSE)
+      remote <- unique(sub("/.*", "", sub(paste0("^", s3_prefix, "/data/", d, "/"), "",
+                                          s3_list_keys(s3_bucket_name,
+                                                       file.path(s3_prefix, "data", d))$Key)))
+      for (v in setdiff(remote[startsWith(remote, "variable=")], keep))
+        s3_run(c("s3", "rm", "--recursive",
+                 paste0("s3://", s3_bucket_name, "/", s3_prefix, "/data/", d, "/", v, "/")))
+    }
     for (f in c("variables.parquet", "lands.parquet"))
-      s3_put(s3_bucket_name, file.path(s3_prefix, DIR_DATA, f),
+      s3_put(s3_bucket_name, file.path(s3_prefix, "data", f),
              file.path(DIR_DATA, f),
              content_type = "application/vnd.apache.parquet",
              cache_control = "max-age=3600")
