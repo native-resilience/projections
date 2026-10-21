@@ -8,28 +8,54 @@
 #   aws sso login --profile mco
 #   Rscript projections-publish.R
 #
-# S3_PREFIX=projections-staging publishes a dry-run copy for review first.
+# Two sources for the zips and PDFs:
+#   default                       mirror the local upload/ folder
+#   NR_PUBLISH_FROM=projections/_staging
+#                                 copy a staged archive (written by an EC2 run
+#                                 of projections.R) over the published one,
+#                                 S3-to-S3; nothing is downloaded
 # Re-runs are cheap: `aws s3 sync` skips files whose size and mtime match.
-# Old archive keys with no current land are reported, never deleted.
+# Published zips/PDFs that no current land produces are reported; with
+# NR_DELETE_ORPHANS=1 they are deleted (bucket versioning keeps a copy).
 
 source("R/setup.R")
 s3_preflight()
 
 staging <- DIR_UPLOAD
+publish_from <- Sys.getenv("NR_PUBLISH_FROM", unset = "")
 
-# ---- Mirror upload/ (zips at the prefix root, PDFs under pdf/) ----
-# delete = FALSE: the prefix also holds data/, native-land.parquet and the
-# manifests, which are not in upload/.
-s3_push(s3_bucket_name, s3_prefix, staging, delete = FALSE)
+if (nzchar(publish_from)) {
+  # ---- Copy the staged archive over the published one (S3-to-S3) ----
+  s3_run(c("s3", "sync",
+           paste0("s3://", s3_bucket_name, "/", publish_from, "/"),
+           paste0("s3://", s3_bucket_name, "/", s3_prefix, "/"),
+           "--no-progress"))
+  staged <- s3_list_keys(s3_bucket_name, publish_from)
+  staged$Key <- sub(paste0("^", publish_from), s3_prefix, staged$Key)
+  published <- s3_list_keys(s3_bucket_name, s3_prefix)
+  check <- merge(staged, published, by = "Key", all.x = TRUE,
+                 suffixes = c(".staged", ".published"))
+  bad <- check$Key[is.na(check$Size.published) |
+                     check$Size.published != check$Size.staged]
+  if (length(bad))
+    stop(length(bad), " staged file(s) missing or different after copy, e.g. ",
+         paste(head(bad, 5), collapse = ", "), call. = FALSE)
+  message("Published ", nrow(staged), " staged files from s3://",
+          s3_bucket_name, "/", publish_from, "/")
+} else {
+  # ---- Mirror upload/ (zips at the prefix root, PDFs under pdf/) ----
+  # delete = FALSE: the prefix also holds data/, native-land.parquet and the
+  # manifests, which are not in upload/.
+  s3_push(s3_bucket_name, s3_prefix, staging, delete = FALSE)
+  s3_verify(s3_bucket_name, s3_prefix, staging,
+            allow_extra = character(0), expect_exact = FALSE)
+}
 
 s3_put(s3_bucket_name,
        paste0(s3_prefix, "/native-land.parquet"),
        "native-land.parquet",
        content_type = "application/vnd.apache.parquet",
        cache_control = "max-age=3600")
-
-s3_verify(s3_bucket_name, s3_prefix, staging,
-          allow_extra = character(0), expect_exact = FALSE)
 
 # ---- data/ (dashboard parquet) ----
 # projections.R pushes these as it goes; this is the full mirror + check.
@@ -55,14 +81,22 @@ expected <- c(paste0(s3_prefix, "/", gsub(" ", "_", land_names), ".zip"),
 remote <- s3_list_keys(s3_bucket_name, s3_prefix)$Key
 orphans <- remote[grepl(paste0("^", s3_prefix, "/(pdf/)?[^/]+\\.(zip|pdf)$"), remote) &
                     !remote %in% expected]
-if (length(orphans))
-  message(length(orphans), " published file(s) no longer produced (not deleted):\n",
+if (length(orphans)) {
+  delete <- Sys.getenv("NR_DELETE_ORPHANS", unset = "0") == "1"
+  message(length(orphans), " published file(s) no longer produced",
+          if (delete) " (deleting):\n" else " (not deleted):\n",
           paste(orphans, collapse = "\n"))
+  if (delete)
+    for (k in orphans) s3_run(c("s3", "rm", paste0("s3://", s3_bucket_name, "/", k)))
+}
 
 # ---- projections-manifest.json (path, size, sha256) ----
 # sha256 of ~114 GB takes a while, so hashes are cached by path + size + mtime.
+# Hashes come from local files only; when publishing from S3 staging the
+# zips and PDFs are listed with their size alone.
 hash_cache_file <- ".sha256-cache.tsv"
-local_files <- c(list.files(staging, recursive = TRUE, full.names = TRUE),
+local_files <- c(if (!nzchar(publish_from))
+                   list.files(staging, recursive = TRUE, full.names = TRUE),
                  "native-land.parquet")
 local_files <- local_files[basename(local_files) != ".DS_Store"]
 info <- file.info(local_files)
