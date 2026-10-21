@@ -109,9 +109,14 @@ nr_smooth_plausible <- function(q, data, type, halfwidth = 10) {
   if (!all(is.finite(v))) return(FALSE)
   emp <- nr_smooth_empirical(data, type, q$Year, halfwidth = halfwidth)
   tol <- 0.05 * stats::sd(nr_per_year(data, type))
-  emp_width <- emp$p95 - emp$p05
-  all(q$p50 >= emp$p05 - tol & q$p50 <= emp$p95 + tol) &&
-    all(q$p95 - q$p05 <= 3 * emp_width + tol)
+  # Years with no data within ±halfwidth have no reference and are skipped;
+  # a check that cannot be decided counts as implausible.
+  ref <- !is.na(emp$p05) & !is.na(emp$p95)
+  if (!any(ref) || !is.finite(tol)) return(FALSE)
+  emp_width <- emp$p95[ref] - emp$p05[ref]
+  ok <- all(q$p50[ref] >= emp$p05[ref] - tol & q$p50[ref] <= emp$p95[ref] + tol) &&
+    all(q$p95[ref] - q$p05[ref] <= 3 * emp_width + tol)
+  isTRUE(ok)
 }
 
 # Every percentile equal to `value` (constant series, or NA for no fit).
