@@ -143,10 +143,16 @@ nr_logo_grobs <- function() {
   )
 }
 
+# Web address printed on every graph (bottom right, under the legend).
+NR_PLOT_CAPTION <- "native-resilience.com"
+
 nr_theme <- function() {
   list(
     theme_minimal(14),
+    labs(caption = NR_PLOT_CAPTION),
     theme(legend.title = element_blank(),
+          plot.caption = element_text(colour = "grey35", size = 11,
+                                      margin = margin(t = 6)),
           legend.justification = c(1, 1),
           legend.position = "bottom",
           legend.key.width = unit(0.25, "in"),

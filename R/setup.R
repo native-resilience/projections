@@ -109,7 +109,7 @@ DIR_UPLOAD <- Sys.getenv("NR_UPLOAD_DIR", unset = "upload")  # published zips an
 
 # Bump to force the matching stage to rebuild everywhere.
 SMOOTH_SPEC_VERSION <- 1L
-OUTPUT_SPEC_VERSION <- 1L
+OUTPUT_SPEC_VERSION <- 2L   # 2: web address on every graph
 
 # ---- Workbook / README text ----
 nr_metadata_text <- function(name, census_year) {
