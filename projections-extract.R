@@ -206,7 +206,7 @@ if (nr_stage("daily")) {
     for (chunk in split(pending$land_id, ceiling(seq_along(pending$land_id) / 50))) {
       duckdb::duckdb_register(con, "chunk", tibble::tibble(land_id = chunk))
       DBI::dbExecute(con, glue::glue("
-        COPY (
+        CREATE OR REPLACE TEMP TABLE chunk_daily AS
           SELECT c.land_id, c.model, c.scenario, c.run, c.date,
                  {paste0('c.', NEX_VARIABLES, collapse = ', ')}
           FROM read_parquet('{DIR_CACHE}/**/*.parquet', hive_partitioning = true,
@@ -215,11 +215,22 @@ if (nr_stage("daily")) {
           JOIN valid_tasks t USING (task_key)
           JOIN chunk k USING (land_id)
           QUALIFY row_number() OVER (PARTITION BY c.land_id, c.model, c.scenario, c.date
-                                     ORDER BY c.filename DESC) = 1
-          ORDER BY c.land_id, c.scenario, c.model, c.date
-        ) TO '{staging}' (FORMAT parquet, COMPRESSION zstd,
-                          PARTITION_BY (land_id), FILENAME_PATTERN 'part-{{i}}',
-                          OVERWRITE_OR_IGNORE)"))
+                                     ORDER BY c.filename DESC) = 1"))
+      # One file per land (part-0.parquet), written explicitly: a partitioned
+      # COPY may split a partition across several files when it writes in
+      # parallel.
+      for (id in chunk) {
+        dest <- file.path(staging, paste0("land_id=", id))
+        dir.create(dest, recursive = TRUE, showWarnings = FALSE)
+        out_file <- file.path(dest, "part-0.parquet")
+        DBI::dbExecute(con, glue::glue("
+          COPY (
+            SELECT * EXCLUDE (land_id) FROM chunk_daily
+            WHERE land_id = '{id}'
+            ORDER BY scenario, model, date
+          ) TO '{out_file}' (FORMAT parquet, COMPRESSION zstd)"))
+      }
+      DBI::dbExecute(con, "DROP TABLE chunk_daily")
       duckdb::duckdb_unregister(con, "chunk")
     }
 

@@ -345,25 +345,34 @@ variables steer a run:
   daemons driven by `purrr::in_parallel()`)
 - `PUBLISH=0` — build locally without reading or writing S3
 
-**Extraction on EC2.** The full extraction reads ~29,000 yearly global
-NetCDF files (~7 TB) for the eight models, so it runs in us-west-2, where
-reading `s3://nex-gddp-cmip6` is free and fast. A memory-heavy instance
-(e.g. `m7i.8xlarge`, 32 vCPU / 128 GB, ~4 GB per worker) with an instance
-role allowed to write `s3://native-resilience/projections/*`, the
-`rocker/geospatial` image and the AWS CLI is enough:
+**Running on EC2.** The extraction reads ~29,000 yearly global NetCDF
+files (~7 TB), so it and the modeling run in us-west-2, where reading
+`s3://nex-gddp-cmip6` is free and fast. `ec2/` holds everything needed:
 
 ``` bash
-git clone https://github.com/native-resilience/projections && cd projections
-S3_AMBIENT_CREDENTIALS=1 NR_WORKERS=28 Rscript projections-extract.R    # resumable
+aws sso login --profile mco
+ec2/launch.sh extract       # projections-extract.R: NEX extraction + daily files (~4 h)
+ec2/launch.sh projections   # projections.R: metrics, smooths, outputs, dashboard (~2.5 h)
+NR_EC2_DRY_RUN=1 ec2/launch.sh projections   # validate the request only
 ```
 
-`S3_AMBIENT_CREDENTIALS=1` makes the S3 helpers use the instance role
-instead of the local `mco` SSO profile.
+`launch.sh` starts a self-terminating instance that clones the current
+branch (it must be pushed), runs the script in `rocker/geospatial` with one
+worker per core, and streams its log to `projections/_logs/`. Check on a run
+with `aws s3 cp s3://native-resilience/projections/_logs/<stage>-status.txt -
+--profile mco`. A successful run terminates its instance; a failed one stops
+it (terminate it once you have looked). Both scripts are resumable: relaunch
+after any failure and the ledger skips finished work. Zips and PDFs from
+`projections` go to `projections/_staging/` for review before publishing.
 
-Each finished model-year is written to S3 at once, so a spot instance
-can be interrupted and restarted without redoing work.
-`NR_TASKS="GFDL-ESM4/ssp245/2097"` limits a run to matching
-model/scenario/year tasks for a smoke test.
+The defaults fit the MCO landing-zone account: private subnets with egress
+through the transit gateway, the S3 gateway endpoint, and
+`EC2-Default-SSM-AD-Role` carrying the inline policy in
+`ec2/iam-policy.json` (write access to `native-resilience/projections/*`
+only). The scripts set `S3_AMBIENT_CREDENTIALS=1` so the S3 helpers use the
+instance role instead of the local `mco` SSO profile.
+`NR_TASKS="GFDL-ESM4/ssp245/2097"` limits `projections-extract.R` to
+matching model/scenario/year tasks for a smoke test.
 
 **Adding a metric.** Append one `metric()` entry to `R/metrics.R` (an id,
 label, an expression over the day's data in US units, a distribution

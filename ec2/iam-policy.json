@@ -1,0 +1,15 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Sid": "ProjectionsPrefixRW", "Effect": "Allow",
+     "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+     "Resource": "arn:aws:s3:::native-resilience/projections/*"},
+    {"Sid": "ProjectionsList", "Effect": "Allow", "Action": "s3:ListBucket",
+     "Resource": "arn:aws:s3:::native-resilience",
+     "Condition": {"StringLike": {"s3:prefix": ["projections/*", "projections"]}}},
+    {"Sid": "NexRead", "Effect": "Allow", "Action": ["s3:GetObject", "s3:ListBucket"],
+     "Resource": ["arn:aws:s3:::nex-gddp-cmip6", "arn:aws:s3:::nex-gddp-cmip6/*"]},
+    {"Sid": "StopSelf", "Effect": "Allow", "Action": "ec2:StopInstances", "Resource": "*",
+     "Condition": {"StringEquals": {"aws:ResourceTag/Project": "nr-projections"}}}
+  ]
+}
