@@ -58,8 +58,8 @@ s3_put(s3_bucket_name,
        cache_control = "max-age=3600")
 
 # ---- Methods summary, on its own (it also opens every land's PDF) ----
-s3_put(s3_bucket_name,
-       paste0(s3_prefix, "/Native-Resilience-Agricultural-Projections-Summary.pdf"),
+summary_key <- paste0(s3_prefix, "/Native-Resilience-Agricultural-Projections-Summary.pdf")
+s3_put(s3_bucket_name, summary_key,
        SUMMARY_PDF, content_type = "application/pdf",
        cache_control = "max-age=3600")
 
@@ -83,7 +83,8 @@ for (f in c("variables.parquet", "lands.parquet"))
 land_names <- sf::st_drop_geometry(nr_read_lands())
 land_names <- land_names$name[land_names$modeled]
 expected <- c(paste0(s3_prefix, "/zip/", gsub(" ", "_", land_names), ".zip"),
-              paste0(s3_prefix, "/pdf/", land_names, "_CMIP6-climate-projections.pdf"))
+              paste0(s3_prefix, "/pdf/", land_names, "_CMIP6-climate-projections.pdf"),
+              summary_key)
 remote <- s3_list_keys(s3_bucket_name, s3_prefix)$Key
 # Includes zips left at the prefix root by the pre-2026 layout.
 orphans <- remote[grepl(paste0("^", s3_prefix, "/((pdf|zip)/)?[^/]+\\.(zip|pdf)$"), remote) &
