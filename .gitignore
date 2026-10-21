@@ -20,7 +20,7 @@ consumer-verify.mjs
 publish*.log
 
 # Pipeline working tree (mirrored on s3://native-resilience/projections/)
-_cache
-_state
-data
+/_cache
+/_state
+/data
 .nr-lands-rotated.rds
