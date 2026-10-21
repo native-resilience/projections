@@ -315,8 +315,12 @@ SELECT * FROM read_parquet(
   'https://data.native-resilience.com/projections/data/smoothed/land_id=0305R/part-0.parquet');
 
 -- DuckDB: one variable across all lands
-SELECT land_id, Year, p50 FROM read_parquet(
-  'https://data.native-resilience.com/projections/data/smoothed-by-variable/variable=temp_mean/scenario=ssp245/part-0.parquet');
+-- (a partition can hold several part-N.parquet files; read them all)
+SELECT land_id, Year, p50 FROM read_parquet([
+  'https://data.native-resilience.com/projections/data/smoothed-by-variable/variable=temp_mean/scenario=ssp245/part-0.parquet',
+  'https://data.native-resilience.com/projections/data/smoothed-by-variable/variable=temp_mean/scenario=ssp245/part-1.parquet']);
+-- or, from S3 with globbing:
+-- SELECT * FROM read_parquet('s3://native-resilience/projections/data/smoothed-by-variable/variable=temp_mean/*/*.parquet', hive_partitioning = true);
 ```
 
 ## Running the pipeline
