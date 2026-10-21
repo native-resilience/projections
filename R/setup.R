@@ -117,7 +117,11 @@ nr_data_key <- function(local) {
 
 # Bump to force the matching stage to rebuild everywhere.
 SMOOTH_SPEC_VERSION <- 1L
-OUTPUT_SPEC_VERSION <- 2L   # 2: web address on every graph
+OUTPUT_SPEC_VERSION <- 3L   # 2: web address on graphs; 3: summary first
+
+# Methods summary placed at the front of every land's PDF and published on
+# its own; edit the .docx and re-export the PDF from Word to change it.
+SUMMARY_PDF <- "Native Resilience Agricultural Projections Summary.pdf"
 
 # ---- Workbook / README text ----
 nr_metadata_text <- function(name, census_year) {

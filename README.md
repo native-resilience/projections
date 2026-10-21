@@ -280,6 +280,11 @@ The per-land zips, PDF reports and dashboard data are archived in the
 public S3 bucket `s3://native-resilience` (us-west-2) under
 `projections/`, served at <https://data.native-resilience.com/projections/>:
 
+- `Native-Resilience-Agricultural-Projections-Summary.pdf` — the methods
+  summary that opens every land's PDF report (source:
+  `Native Resilience Agricultural Projections Summary.docx` in this repo;
+  edit it, re-export the PDF from Word, and re-run the outputs stage).
+
 - `zip/<Native_Land_Name>.zip` — the XLSX workbook, PDF report and PNG
   graphs for one land (spaces in the name become underscores).
 - `pdf/<Native Land Name>_CMIP6-climate-projections.pdf` — the PDF report alone.

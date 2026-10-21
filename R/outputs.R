@@ -288,6 +288,22 @@ nr_save_graphs <- function(graphs, pdf_file, png_dir) {
   pdf_file
 }
 
+# ---- Methods summary ----
+# Put the project's methods summary in front of a land's graphs, as the
+# published reports have always opened with it.
+nr_prepend_summary <- function(pdf, summary = SUMMARY_PDF) {
+  if (!file.exists(summary)) {
+    warning("summary PDF not found (", summary, "); ", basename(pdf),
+            " has graphs only", call. = FALSE)
+    return(invisible(pdf))
+  }
+  out <- tempfile(fileext = ".pdf")
+  processx::run("qpdf", c("--warning-exit-0", "--empty", "--pages", summary, pdf, "--", out))
+  file.copy(out, pdf, overwrite = TRUE)
+  unlink(out)
+  invisible(pdf)
+}
+
 # ---- PDF compression ----
 # Same steps as the old ~/git/compress.sh, but every file works in its own
 # temp dir so parallel runs cannot overwrite each other's intermediates. Any

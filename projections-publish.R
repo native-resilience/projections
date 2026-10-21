@@ -57,6 +57,12 @@ s3_put(s3_bucket_name,
        content_type = "application/vnd.apache.parquet",
        cache_control = "max-age=3600")
 
+# ---- Methods summary, on its own (it also opens every land's PDF) ----
+s3_put(s3_bucket_name,
+       paste0(s3_prefix, "/Native-Resilience-Agricultural-Projections-Summary.pdf"),
+       SUMMARY_PDF, content_type = "application/pdf",
+       cache_control = "max-age=3600")
+
 # ---- data/ (dashboard parquet) ----
 # projections.R pushes these as it goes; this is the full mirror + check.
 for (d in c("annual", "smoothed", "annual-by-variable", "smoothed-by-variable")) {

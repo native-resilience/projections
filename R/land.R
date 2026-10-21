@@ -70,6 +70,7 @@ process_land <- function(land, publish) {
     pdf <- nr_save_graphs(nr_plot_land(land$name, annual, smoothed),
                           file.path(dir, paste0(stem, ".pdf")),
                           file.path(dir, "png"))
+    nr_prepend_summary(pdf)
     nr_compress_pdf(pdf)
     dir.create(file.path(DIR_UPLOAD, "pdf"), recursive = TRUE, showWarnings = FALSE)
     file.copy(pdf, file.path(DIR_UPLOAD, "pdf", basename(pdf)), overwrite = TRUE)
