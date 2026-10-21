@@ -228,8 +228,8 @@ precipitation</td>
 <tr>
 <td>Number of Days with Heat Index Hazard</td>
 <td>count</td>
-<td><p>Number of days per year at each of the National Atmospheric and
-Oceanographic Organization’s (NOAA) heat index hazard levels.</p>
+<td><p>Number of days per year at each of the National Oceanic and
+Atmospheric Administration’s (NOAA) heat index hazard levels.</p>
 <p><em>Caution</em>: fatigue is possible with prolonged exposure and
 activity; continuing activity could result in heat cramps.</p>
 <p><em>Extreme caution</em>: heat cramps and heat exhaustion are
