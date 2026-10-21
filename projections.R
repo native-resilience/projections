@@ -99,7 +99,10 @@ if (nrow(pending_smooth) > 0) {
 # reported and left pending; the script exits non-zero at the end.
 lands_failed <- character(0)
 if (nrow(todo) > 0) {
-  batches <- split(seq_len(nrow(todo)), ceiling(seq_len(nrow(todo)) / 48))
+  # Two lands per worker per batch keeps every worker busy while still
+  # recording and uploading progress regularly.
+  batch_size <- max(48L, 2L * nr_workers())
+  batches <- split(seq_len(nrow(todo)), ceiling(seq_len(nrow(todo)) / batch_size))
   for (b in batches) {
     res <- nr_map(b, \(i) tryCatch(
       process_land(todo[i, ], publish),
