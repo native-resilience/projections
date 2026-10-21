@@ -73,7 +73,8 @@ process_land <- function(land, publish) {
     nr_compress_pdf(pdf)
     dir.create(file.path(DIR_UPLOAD, "pdf"), recursive = TRUE, showWarnings = FALSE)
     file.copy(pdf, file.path(DIR_UPLOAD, "pdf", basename(pdf)), overwrite = TRUE)
-    zipfile <- file.path(normalizePath(DIR_UPLOAD),
+    dir.create(file.path(DIR_UPLOAD, "zip"), recursive = TRUE, showWarnings = FALSE)
+    zipfile <- file.path(normalizePath(DIR_UPLOAD), "zip",
                          paste0(gsub(" ", "_", land$name), ".zip"))
     old_wd <- setwd(dir)
     on.exit(setwd(old_wd), add = TRUE)

@@ -280,8 +280,8 @@ The per-land zips, PDF reports and dashboard data are archived in the
 public S3 bucket `s3://native-resilience` (us-west-2) under
 `projections/`, served at <https://data.native-resilience.com/projections/>:
 
-- `<Native_Land_Name>.zip` — the XLSX workbook, PDF report and PNG graphs
-  for one land (spaces in the name become underscores).
+- `zip/<Native_Land_Name>.zip` — the XLSX workbook, PDF report and PNG
+  graphs for one land (spaces in the name become underscores).
 - `pdf/<Native Land Name>_CMIP6-climate-projections.pdf` — the PDF report alone.
 - `native-land.parquet` — GeoParquet boundaries of every unit: 633 modeled
   lands plus 250 off-reservation trust lands and Hawaiian Home Lands.

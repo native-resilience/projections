@@ -96,7 +96,7 @@ land <-
                            name),
     pdf_url = paste0(BASE, "pdf/",
                      url_enc(paste0(name, "_CMIP6-climate-projections.pdf"))),
-    zip_url = paste0(BASE,
+    zip_url = paste0(BASE, "zip/",
                      url_enc(paste0(str_replace_all(name, " ", "_"), ".zip")))
   )
 stopifnot("duplicate slugs" = !anyDuplicated(land$slug))

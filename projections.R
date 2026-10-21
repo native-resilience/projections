@@ -7,7 +7,7 @@
 #   annual     data/annual/land_id=…/part-0.parquet   (long; one row per
 #              model × scenario × Year × metric)
 #   smooth     data/smoothed/land_id=…/part-0.parquet
-#   outputs    output/<name>/ xlsx + pdf + png, upload/<name>.zip, upload/pdf/
+#   outputs    output/<name>/ xlsx + pdf + png, upload/zip/<name>.zip, upload/pdf/
 #   dashboard  data/{annual,smoothed}-by-variable/variable=…/scenario=…/ and
 #              the lookup tables data/variables.parquet, data/lands.parquet
 #

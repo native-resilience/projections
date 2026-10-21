@@ -1,6 +1,6 @@
 # projections-publish.R — publish the projections archive to S3.
 #
-# Mirrors upload/ (per-land zips + pdf/), native-land.parquet and the data/
+# Mirrors upload/ (zip/ and pdf/), native-land.parquet and the data/
 # prefix (per-land and by-variable parquet, lookup tables) to
 # s3://native-resilience/projections/, served at
 # https://data.native-resilience.com/projections/. Run after projections.R:
@@ -43,7 +43,7 @@ if (nzchar(publish_from)) {
   message("Published ", nrow(staged), " staged files from s3://",
           s3_bucket_name, "/", publish_from, "/")
 } else {
-  # ---- Mirror upload/ (zips at the prefix root, PDFs under pdf/) ----
+  # ---- Mirror upload/ (zips under zip/, PDFs under pdf/) ----
   # delete = FALSE: the prefix also holds data/, native-land.parquet and the
   # manifests, which are not in upload/.
   s3_push(s3_bucket_name, s3_prefix, staging, delete = FALSE)
@@ -76,10 +76,11 @@ for (f in c("variables.parquet", "lands.parquet"))
 # ---- Orphans: published zips/PDFs that no current land produces ----
 land_names <- sf::st_drop_geometry(nr_read_lands())
 land_names <- land_names$name[land_names$modeled]
-expected <- c(paste0(s3_prefix, "/", gsub(" ", "_", land_names), ".zip"),
+expected <- c(paste0(s3_prefix, "/zip/", gsub(" ", "_", land_names), ".zip"),
               paste0(s3_prefix, "/pdf/", land_names, "_CMIP6-climate-projections.pdf"))
 remote <- s3_list_keys(s3_bucket_name, s3_prefix)$Key
-orphans <- remote[grepl(paste0("^", s3_prefix, "/(pdf/)?[^/]+\\.(zip|pdf)$"), remote) &
+# Includes zips left at the prefix root by the pre-2026 layout.
+orphans <- remote[grepl(paste0("^", s3_prefix, "/((pdf|zip)/)?[^/]+\\.(zip|pdf)$"), remote) &
                     !remote %in% expected]
 if (length(orphans)) {
   delete <- Sys.getenv("NR_DELETE_ORPHANS", unset = "0") == "1"
